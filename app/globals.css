@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+/* Habilita la variante `dark:` basada en clase (controlada por ThemeProvider) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------ */
+/*  Design tokens — Maquitech                                          */
+/*  Light theme: grises fríos + blanco | Dark theme: navy industrial   */
+/* ------------------------------------------------------------------ */
+:root {
+  --background: #f4f6f9;
+  --surface: #ffffff;
+  --surface-2: #edf0f5;
+  --border: #e2e7ef;
+  --foreground: #0e1526;
+  --muted: #5d6b82;
+  --ring: #2563eb;
+}
+
+.dark {
+  --background: #090e18;
+  --surface: #0f1626;
+  --surface-2: #18223a;
+  --border: #1e2a44;
+  --foreground: #e8edf6;
+  --muted: #8d99b0;
+  --ring: #3b82f6;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-ring: var(--ring);
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.35s ease, color 0.35s ease;
+}
+
+/* Selección de texto */
+::selection {
+  background: rgb(37 99 235 / 0.2);
+}
+
+/* Scrollbar discreta */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.35) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgb(148 163 184 / 0.35);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgb(148 163 184 / 0.55);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Focus visible accesible */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Patrón de rejilla industrial (login, paneles decorativos) */
+.bg-grid {
+  background-image: linear-gradient(
+      to right,
+      rgb(148 163 184 / 0.09) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, rgb(148 163 184 / 0.09) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+/* Respeta usuarios con movimiento reducido */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Impresión — hoja oficial A4 del PAR                                */
+/* ------------------------------------------------------------------ */
+@page {
+  size: A4;
+  margin: 10mm;
+}
+
+@media print {
+  body {
+    background-color: #ffffff !important;
+  }
+}
