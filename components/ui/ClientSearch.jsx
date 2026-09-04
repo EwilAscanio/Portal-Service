@@ -25,8 +25,10 @@ export function ClientSearch({
   value = "",
   onChange,
   label = "Cliente *",
+  placeholder = "Buscar por nombre, código o RIF...",
   disabled = false,
   autoFocus = false,
+  error,
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -119,6 +121,7 @@ export function ClientSearch({
             </button>
           )}
         </div>
+        {error && <p className="mt-1.5 text-xs font-medium text-red-500">{error}</p>}
       </div>
     );
   }
@@ -144,7 +147,7 @@ export function ClientSearch({
             if (!disabled) setOpen(true);
           }}
           onKeyDown={handleKeyDown}
-          placeholder="Buscar por nombre, código o RIF..."
+          placeholder={placeholder}
           className="h-11 w-full rounded-xl border border-border bg-surface pl-10 pr-9 text-sm text-foreground placeholder:text-muted/60 transition-colors duration-200 hover:border-slate-300 focus:border-blue-500 focus:outline-none focus-visible:outline-none focus:ring-4 focus:ring-blue-500/15 dark:hover:border-slate-600 disabled:cursor-not-allowed disabled:opacity-70"
         />
         {!disabled && query ? (
@@ -216,6 +219,7 @@ export function ClientSearch({
           </motion.div>
         )}
       </AnimatePresence>
+      {error && <p className="mt-1.5 text-xs font-medium text-red-500">{error}</p>}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,13 +11,13 @@ import { Input, Textarea } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
-import { ClientSearch } from "@/components/par/ClientSearch";
+import { ClientSearch } from "@/components/ui/ClientSearch";
 import { CatalogSearch } from "@/components/par/CatalogSearch";
 import { notify } from "@/lib/toast";
 import {
   getClients,
-  getEquipment,
   getProducts,
+  getEquipment,
   getConfiguration,
   getParTemplates,
   getParTemplateById,
@@ -32,7 +32,6 @@ const equipmentRowSchema = z.object({
   itemNo: z.coerce.number().optional(),
   isMain: z.boolean().optional(),
   equipmentId: z.string().optional().or(z.literal("")),
-  productId: z.string().optional().or(z.literal("")),
   tipo: z.string().optional().or(z.literal("")),
   marca: z.string().optional().or(z.literal("")),
   serial: z.string().optional().or(z.literal("")),
@@ -142,6 +141,7 @@ export function ParForm({
   }, [items, exchangeRate]);
 
   const { clients, productCatalog } = useCatalogs();
+  const [clientEquipment, setClientEquipment] = useState([]);
 
   const [templates, setTemplates] = useState([]);
   const [loadOpen, setLoadOpen] = useState(false);
@@ -220,10 +220,47 @@ export function ParForm({
   }, [session, form]);
 
   const clientId = form.watch("clientId");
+  const prevClientIdRef = useRef(clientId);
   const clientCode = useMemo(
     () => clients.find((client) => client.id === clientId)?.codclie ?? "",
     [clients, clientId]
   );
+
+  useEffect(() => {
+    const prev = prevClientIdRef.current;
+    prevClientIdRef.current = clientId;
+
+    if (!clientId) {
+      setClientEquipment([]);
+      return undefined;
+    }
+
+    let active = true;
+    getEquipment({ clientId })
+      .then((data) => {
+        if (!active) return;
+        setClientEquipment(data);
+        if (prev && prev !== clientId) {
+          const ids = new Set(data.map((row) => row.id));
+          const rows = form.getValues("equipment") ?? [];
+          rows.forEach((row, index) => {
+            if (row.equipmentId && !ids.has(row.equipmentId)) {
+              form.setValue(`equipment.${index}.equipmentId`, "");
+              form.setValue(`equipment.${index}.tipo`, "");
+              form.setValue(`equipment.${index}.marca`, "");
+              form.setValue(`equipment.${index}.serial`, "");
+              form.setValue(`equipment.${index}.modelo`, "");
+            }
+          });
+        }
+      })
+      .catch(() => {
+        if (active) setClientEquipment([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [clientId, form]);
 
   useEffect(() => {
     let active = true;
@@ -245,24 +282,18 @@ export function ParForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- prefill único al montar
   }, []);
 
-  const equipoProducts = useMemo(
-    () => productCatalog.filter((product) => product.type === "Equipo"),
-    [productCatalog]
-  );
-
   const itemProducts = useMemo(
     () => productCatalog.filter((product) => product.type !== "Equipo"),
     [productCatalog]
   );
 
-  function handleProductChange(index, product) {
-    form.setValue(`equipment.${index}.productId`, product?.id ?? "");
-    form.setValue(`equipment.${index}.equipmentId`, "");
-    if (product) {
-      form.setValue(`equipment.${index}.tipo`, product.description || "");
-      form.setValue(`equipment.${index}.marca`, product.brand || "");
-      form.setValue(`equipment.${index}.serial`, product.serial || "");
-      form.setValue(`equipment.${index}.modelo`, product.modelo || "");
+  function handleEquipmentChange(index, equipment) {
+    form.setValue(`equipment.${index}.equipmentId`, equipment?.id ?? "");
+    if (equipment) {
+      form.setValue(`equipment.${index}.tipo`, equipment.name || "");
+      form.setValue(`equipment.${index}.marca`, equipment.brand || "");
+      form.setValue(`equipment.${index}.serial`, equipment.serial || "");
+      form.setValue(`equipment.${index}.modelo`, equipment.model || "");
     }
   }
 
@@ -283,7 +314,6 @@ export function ParForm({
       .filter(
         (eq) =>
           eq.equipmentId ||
-          eq.productId ||
           eq.tipo ||
           eq.marca ||
           eq.serial ||
@@ -294,7 +324,6 @@ export function ParForm({
         itemNo: index + 1,
         isMain: index === 0,
         equipmentId: eq.equipmentId || null,
-        productId: eq.productId || null,
         tipo: eq.tipo || null,
         marca: eq.marca || null,
         serial: eq.serial || null,
@@ -426,7 +455,7 @@ export function ParForm({
             <CardDescription>
               {isLocked
                 ? "Datos del equipo (solo lectura)."
-                : "Seleccione el equipo principal desde el catálogo y complemente sus datos."}
+                : "Seleccione el equipo del inventario del cliente y complemente sus datos."}
             </CardDescription>
           </div>
           {isLocked && (
@@ -447,7 +476,6 @@ export function ParForm({
                   itemNo: equipmentFields.length + 1,
                   isMain: equipmentFields.length === 0,
                   equipmentId: "",
-                  productId: "",
                   tipo: "",
                   marca: "",
                   serial: "",
@@ -487,34 +515,12 @@ export function ParForm({
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <CatalogSearch
-                  options={equipoProducts}
-                  value={form.watch(`equipment.${index}.productId`)}
-                  onSelect={(product) => handleProductChange(index, product)}
-                  disabled={isLocked}
-                  label="Producto (tipo Equipo)"
+                  options={clientEquipment}
+                  value={form.watch(`equipment.${index}.equipmentId`)}
+                  onSelect={(equipment) => handleEquipmentChange(index, equipment)}
+                  disabled={isLocked || !clientId}
+                  label="Equipo instalado"
                   autoFocus={index === focusEquipIndex}
-                  placeholder="Buscar por nombre, marca, código, serial o modelo..."
-                  getTitle={(product) => product.description || "—"}
-                  getSubtitle={(product) =>
-                    [
-                      product.brand || "",
-                      product.serial ? ` · ${product.serial}` : "",
-                      product.modelo ? ` · ${product.modelo}` : "",
-                    ]
-                      .join("")
-                      .trim()
-                  }
-                  matches={(product, q) => {
-                    const value = q.trim().toLowerCase();
-                    return (
-                      (product.description &&
-                        product.description.toLowerCase().includes(value)) ||
-                      (product.brand && product.brand.toLowerCase().includes(value)) ||
-                      (product.code && product.code.toLowerCase().includes(value)) ||
-                      (product.serial && product.serial.toLowerCase().includes(value)) ||
-                      (product.modelo && product.modelo.toLowerCase().includes(value))
-                    );
-                  }}
                 />
                 <Input
                   label="Tipo"
@@ -864,21 +870,18 @@ export function ParForm({
 
 function useCatalogs() {
   const [clients, setClients] = useState([]);
-  const [equipmentCatalog, setEquipmentCatalog] = useState([]);
   const [productCatalog, setProductCatalog] = useState([]);
 
   useEffect(() => {
     let active = true;
     async function loadCatalogs() {
       try {
-        const [clientsData, equipmentData, productsData] = await Promise.all([
+        const [clientsData, productsData] = await Promise.all([
           getClients(),
-          getEquipment(),
           getProducts(),
         ]);
         if (!active) return;
         setClients(clientsData);
-        setEquipmentCatalog(equipmentData);
         setProductCatalog(productsData);
       } catch (err) {
         console.error("Error cargando catálogos:", err);
@@ -890,5 +893,5 @@ function useCatalogs() {
     };
   }, []);
 
-  return { clients, equipmentCatalog, productCatalog };
+  return { clients, productCatalog };
 }

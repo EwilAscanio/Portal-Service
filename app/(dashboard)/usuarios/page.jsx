@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, ShieldCheck, ToggleLeft, ToggleRight } from "lucide-react";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useDebounce } from "@/hooks/useDebounce";
 import { notify } from "@/lib/toast";
 import {
   getUsers,
@@ -16,18 +18,15 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/Modal";
+import { SearchInput } from "@/components/ui/SearchInput";
+import { ViewToggle } from "@/components/ui/ViewToggle";
 import { FadeInUp } from "@/components/ui/animated";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { UserFormModal } from "@/components/users/UserFormModal";
+import { UserCardGrid } from "@/components/users/UserCardGrid";
+import { UserViewModal } from "@/components/users/UserViewModal";
+import { ROLE_BADGE } from "@/lib/status";
 import { cn } from "@/utils/cn";
-
-const ROLE_BADGE = {
-  Administrador: "danger",
-  Supervisor: "info",
-  Coordinador: "purple",
-  Técnico: "warning",
-  Usuario: "neutral",
-};
 
 function formatDateTime(iso) {
   if (!iso) return "—";
@@ -51,6 +50,24 @@ export default function UsuariosPage() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [confirm, setConfirm] = useState({ open: false, user: null });
+  const [viewUser, setViewUser] = useState(null);
+  const [view, setView, viewHydrated] = useLocalStorage(
+    "mq-usuarios-view",
+    "table"
+  );
+  const effectiveView = viewHydrated ? view : "table";
+  const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 200);
+
+  const filtered = useMemo(() => {
+    const q = debouncedQuery.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter((row) =>
+      ["name", "login", "email"].some((key) =>
+        String(row[key] ?? "").toLowerCase().includes(q)
+      )
+    );
+  }, [users, debouncedQuery]);
 
   const loadData = useCallback(async () => {
     try {
@@ -71,7 +88,7 @@ export default function UsuariosPage() {
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleCreate = () => { setEditing(null); setFormOpen(true); };
-  const handleEdit = (user) => { setEditing(user); setFormOpen(true); };
+  const handleEdit = (user) => { setViewUser(null); setEditing(user); setFormOpen(true); };
 
   const handleSubmit = async (payload) => {
     setSaving(true);
@@ -202,27 +219,50 @@ export default function UsuariosPage() {
       <FadeInUp>
         <Card>
           <CardContent>
-            <DataTable
-              columns={columns}
-              data={users}
-              loading={loading}
-              searchPlaceholder="Buscar por nombre, usuario o correo…"
-              searchKeys={["name", "login", "email"]}
-              pageSize={10}
-              toolbar={
-                <div className="flex items-center gap-2">
-                  <Badge variant="info" className="text-xs">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    {users.length} usuarios
-                  </Badge>
-                </div>
-              }
-              emptyTitle="No se encontraron usuarios"
-              emptyDescription="Crea el primer usuario para comenzar."
-            />
+            <div className="mb-4 flex flex-nowrap items-center justify-between gap-3">
+              <SearchInput
+                value={query}
+                onChange={setQuery}
+                placeholder="Buscar por nombre, usuario o correo…"
+                className="sm:max-w-xs"
+              />
+              <div className="flex flex-nowrap items-center gap-3">
+                <Badge variant="info" className="text-xs whitespace-nowrap">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  {filtered.length} usuarios
+                </Badge>
+                <ViewToggle view={effectiveView} onChange={setView} />
+              </div>
+            </div>
+
+            {effectiveView === "table" ? (
+              <DataTable
+                columns={columns}
+                data={filtered}
+                loading={loading}
+                searchable={false}
+                pageSize={10}
+                emptyTitle="No se encontraron usuarios"
+                emptyDescription="Crea el primer usuario para comenzar."
+              />
+            ) : (
+              <UserCardGrid
+                users={filtered}
+                loading={loading}
+                onView={setViewUser}
+                onEdit={handleEdit}
+                onToggleStatus={handleToggleStatus}
+              />
+            )}
           </CardContent>
         </Card>
       </FadeInUp>
+
+      <UserViewModal
+        user={viewUser}
+        onClose={() => setViewUser(null)}
+        onEdit={handleEdit}
+      />
 
       <UserFormModal
         key={editing?.id ?? "create"}

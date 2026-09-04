@@ -14,7 +14,7 @@ const defaultMatch = (item, q) => {
     (item.brand && item.brand.toLowerCase().includes(value)) ||
     (item.model && item.model.toLowerCase().includes(value)) ||
     (item.serial && item.serial.toLowerCase().includes(value)) ||
-    (item.client_description && item.client_description.toLowerCase().includes(value))
+    (item.client_name && item.client_name.toLowerCase().includes(value))
   );
 };
 
@@ -25,7 +25,7 @@ const defaultGetSubtitle = (item) =>
     item.brand ? `${item.brand} ` : "",
     item.model || "",
     item.serial ? ` · ${item.serial}` : "",
-    item.client_description ? ` · ${item.client_description}` : "",
+    item.client_name ? ` · ${item.client_name}` : "",
   ]
     .join("")
     .trim();
@@ -55,6 +55,7 @@ export function CatalogSearch({
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [browseAll, setBrowseAll] = useState(false);
   const [highlighted, setHighlighted] = useState(-1);
   const [dropdownStyle, setDropdownStyle] = useState(null);
   const inputRef = useRef(null);
@@ -68,9 +69,10 @@ export function CatalogSearch({
 
   const results = useMemo(() => {
     const q = query.trim();
-    if (q.length < 2) return [];
-    return options.filter((item) => matches(item, q)).slice(0, 8);
-  }, [options, query, matches]);
+    if (q.length >= 2) return options.filter((item) => matches(item, q)).slice(0, 8);
+    if (browseAll) return options.slice(0, 8);
+    return [];
+  }, [options, query, matches, browseAll]);
 
   useEffect(() => {
     if (autoFocus && inputRef.current) inputRef.current.focus();
@@ -87,7 +89,7 @@ export function CatalogSearch({
     setHighlighted(-1);
   }, [query]);
 
-  const showResults = open && query.trim().length >= 2 && !disabled;
+  const showResults = open && !disabled && (query.trim().length >= 2 || browseAll);
 
   useEffect(() => {
     if (!showResults) return undefined;
@@ -105,26 +107,45 @@ export function CatalogSearch({
     };
   }, [showResults, containerRef]);
 
+  function openBrowse() {
+    setBrowseAll(true);
+    setOpen(true);
+  }
+
+  const effectiveCount =
+    results.length ||
+    (browseAll || (!query.trim() && open) ? Math.min(options.length, 8) : 0);
+
   function handleSelect(item) {
     onSelect(item);
     setQuery("");
+    setBrowseAll(false);
     setOpen(false);
   }
 
   function handleKeyDown(event) {
     if (event.key === "Escape") {
       setOpen(false);
+      setBrowseAll(false);
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (!query.trim() && !browseAll) openBrowse();
+      else setOpen(true);
+      setHighlighted((index) => (effectiveCount ? (index + 1) % effectiveCount : 0));
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!query.trim() && !browseAll) openBrowse();
+      setHighlighted((index) =>
+        effectiveCount ? (index - 1 + effectiveCount) % effectiveCount : 0
+      );
       return;
     }
     if (results.length === 0) return;
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setOpen(true);
-      setHighlighted((index) => (index + 1) % results.length);
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setHighlighted((index) => (index - 1 + results.length) % results.length);
-    } else if (event.key === "Enter" && highlighted >= 0 && results[highlighted]) {
+    if (event.key === "Enter" && highlighted >= 0 && results[highlighted]) {
       event.preventDefault();
       handleSelect(results[highlighted]);
     }
@@ -153,6 +174,7 @@ export function CatalogSearch({
                 onClick={() => {
                   onSelect(null);
                   setQuery("");
+                  setBrowseAll(false);
                   setTimeout(() => inputRef.current?.focus(), 0);
                 }}
                 aria-label="Cambiar"
@@ -187,6 +209,7 @@ export function CatalogSearch({
               onClick={() => {
                 onSelect(null);
                 setQuery("");
+                setBrowseAll(false);
                 setTimeout(() => inputRef.current?.focus(), 0);
               }}
               aria-label="Cambiar"
@@ -216,6 +239,7 @@ export function CatalogSearch({
           onChange={(event) => {
             if (disabled) return;
             setQuery(event.target.value);
+            setBrowseAll(false);
             setOpen(true);
           }}
           onFocus={() => {
@@ -228,14 +252,29 @@ export function CatalogSearch({
         {!disabled && query ? (
           <button
             type="button"
-            onClick={() => setQuery("")}
+            onClick={() => {
+              setQuery("");
+              setBrowseAll(false);
+            }}
             aria-label="Limpiar búsqueda"
             className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
           </button>
         ) : (
-          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <button
+            type="button"
+            onMouseDown={(event) => {
+              event.preventDefault();
+              if (disabled) return;
+              openBrowse();
+            }}
+            aria-label="Ver todos los equipos"
+            title="Ver todos"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
         )}
       </div>
 
@@ -261,7 +300,9 @@ export function CatalogSearch({
                 {results.length === 0 ? (
                   <div className="flex items-center gap-3 px-4 py-6 text-sm text-muted">
                     <SearchX className="h-4 w-4 shrink-0" />
-                    Sin resultados para “{query.trim()}”
+                    {browseAll && !query.trim()
+                      ? "Este cliente no tiene equipos registrados"
+                      : `Sin resultados para “${query.trim()}”`}
                   </div>
                 ) : (
                   <ul className="max-h-72 overflow-y-auto p-1.5">

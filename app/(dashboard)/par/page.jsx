@@ -1,18 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Eye, Plus, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, LayoutTemplate, Plus, Trash2, XCircle } from "lucide-react";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useDebounce } from "@/hooks/useDebounce";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { notify } from "@/lib/toast";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { DataTable } from "@/components/tables/DataTable";
+import { ParCardGrid } from "@/components/par/ParCardGrid";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ConfirmDialog, Modal } from "@/components/ui/Modal";
 import { ReadonlyField } from "@/components/ui/ReadonlyField";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { Select } from "@/components/ui/Select";
+import { ViewToggle } from "@/components/ui/ViewToggle";
 import { FadeInUp } from "@/components/ui/animated";
 import { PAR_STATUS_VARIANTS } from "@/lib/status";
 import { formatCurrency, formatVes, formatDate } from "@/lib/format";
@@ -37,6 +43,14 @@ export default function ParPage() {
   const [viewPar, setViewPar] = useState(null);
   const [toDelete, setToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 200);
+
+  const [view, setView, viewHydrated] = useLocalStorage(
+    "mq-par-view",
+    "table"
+  );
+  const effectiveView = viewHydrated ? view : "table";
 
   const load = useCallback(async () => {
     try {
@@ -57,10 +71,20 @@ export default function ParPage() {
 
   const effectiveStatus = (row) => row.display_status ?? row.status;
 
+  const filtered = useMemo(() => {
+    const q = debouncedQuery.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((row) =>
+      ["par_number", "client_name", "client_code"].some((key) =>
+        String(row[key] ?? "").toLowerCase().includes(q)
+      )
+    );
+  }, [rows, debouncedQuery]);
+
   const visibleRows =
     statusFilter === "Todos"
-      ? rows
-      : rows.filter((row) => effectiveStatus(row) === statusFilter);
+      ? filtered
+      : filtered.filter((row) => effectiveStatus(row) === statusFilter);
 
   const handleDelete = async () => {
     if (!toDelete) return;
@@ -230,21 +254,32 @@ export default function ParPage() {
         title="Planilla de Atención de Requisiciones"
         description="Gestiona las requisiciones de servicio y materiales."
         actions={
-          <Button icon={Plus} onClick={() => router.push("/par/new")}>
-            Crear PAR
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              icon={LayoutTemplate}
+              onClick={() => router.push("/par/plantillas")}
+            >
+              Plantillas
+            </Button>
+            <Button icon={Plus} onClick={() => router.push("/par/new")}>
+              Crear PAR
+            </Button>
+          </>
         }
       />
 
       <FadeInUp>
         <Card>
           <CardContent>
-            <DataTable
-              columns={columns}
-              data={visibleRows}
-              loading={loading}
-              searchPlaceholder="Buscar por número, cliente o código…"
-              toolbar={
+            <div className="mb-4 flex flex-nowrap items-center justify-between gap-3">
+              <SearchInput
+                value={query}
+                onChange={setQuery}
+                placeholder="Buscar por número, cliente o código…"
+                className="sm:max-w-xs"
+              />
+              <div className="flex flex-nowrap items-center gap-3">
                 <Select
                   aria-label="Filtrar por estado"
                   className="w-52"
@@ -255,11 +290,32 @@ export default function ParPage() {
                     label: status === "Todos" ? "Todos los estados" : status,
                   }))}
                 />
-              }
-              emptyTitle="No se encontraron PARs"
-              emptyDescription="Crea una nueva planilla para comenzar."
-              onRowClick={setViewPar}
-            />
+                <Badge variant="info">{visibleRows.length} PARs</Badge>
+                <ViewToggle view={effectiveView} onChange={setView} />
+              </div>
+            </div>
+
+            {effectiveView === "table" ? (
+              <DataTable
+                columns={columns}
+                data={visibleRows}
+                loading={loading}
+                searchable={false}
+                emptyTitle="No se encontraron PARs"
+                emptyDescription="Crea una nueva planilla para comenzar."
+                onRowClick={setViewPar}
+              />
+            ) : (
+              <ParCardGrid
+                pars={visibleRows}
+                loading={loading}
+                onView={setViewPar}
+                onNavigate={(par) => router.push(`/par/${par.id}`)}
+                onApprove={(par) => handleTransition(par, "Aprobado")}
+                onDelete={(par) => setToDelete(par)}
+                onReject={(par) => handleTransition(par, "Rechazado")}
+              />
+            )}
           </CardContent>
         </Card>
       </FadeInUp>
@@ -267,7 +323,7 @@ export default function ParPage() {
       <Modal
         open={Boolean(viewPar)}
         onClose={() => setViewPar(null)}
-        size="lg"
+        size="2xl"
         title={viewPar ? `PAR ${viewPar.par_number}` : ""}
         description={
           viewPar
@@ -293,7 +349,7 @@ export default function ParPage() {
       >
         {viewPar && (
           <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <ReadonlyField label="Número">
                 <span className="font-semibold text-foreground">
                   {viewPar.par_number}
@@ -305,29 +361,27 @@ export default function ParPage() {
                   minute: "2-digit",
                 })}
               </ReadonlyField>
-            </div>
-
-            <ReadonlyField label="Cliente">{viewPar.client_name}</ReadonlyField>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <ReadonlyField label="Código">
-                {viewPar.client_code || "—"}
-              </ReadonlyField>
-              <ReadonlyField label="Equipo principal">
-                {viewPar.main_equipment || "—"}
-              </ReadonlyField>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <ReadonlyField label="Atención">
-                {viewPar.atencion || "—"}
-              </ReadonlyField>
               <ReadonlyField label="Tasa de cambio">
                 {viewPar.exchange_rate ?? "—"}
               </ReadonlyField>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
+                  Estado
+                </label>
+                <div className="flex h-11 items-center">
+                  <StatusBadge
+                    status={effectiveStatus(viewPar)}
+                    variants={PAR_STATUS_VARIANTS}
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <ReadonlyField label="Cliente">{viewPar.client_name}</ReadonlyField>
+              <ReadonlyField label="Código">
+                {viewPar.client_code || "—"}
+              </ReadonlyField>
               <ReadonlyField label="Total $">
                 <span className="font-semibold text-blue-600 dark:text-blue-400">
                   {formatCurrency(viewPar.total_usd)}
@@ -340,7 +394,13 @@ export default function ParPage() {
               </ReadonlyField>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <ReadonlyField label="Equipo principal">
+                {viewPar.main_equipment || "—"}
+              </ReadonlyField>
+              <ReadonlyField label="Atención">
+                {viewPar.atencion || "—"}
+              </ReadonlyField>
               <ReadonlyField label="Elaborado por">
                 {viewPar.created_by_name || "—"}
               </ReadonlyField>
@@ -352,16 +412,6 @@ export default function ParPage() {
             <ReadonlyField label="Observaciones">
               {viewPar.observations || "—"}
             </ReadonlyField>
-
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Estado
-              </label>
-              <StatusBadge
-                status={effectiveStatus(viewPar)}
-                variants={PAR_STATUS_VARIANTS}
-              />
-            </div>
           </div>
         )}
       </Modal>

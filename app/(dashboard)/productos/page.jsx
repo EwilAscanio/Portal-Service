@@ -447,7 +447,6 @@ export default function ProductosPage() {
               error={errors.type}
               onChange={setField("type")}
               options={[
-                { value: "Equipo", label: "Equipo" },
                 { value: "Repuesto", label: "Repuesto" },
                 { value: "Servicio", label: "Servicio" },
               ]}

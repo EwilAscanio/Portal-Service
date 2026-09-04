@@ -40,7 +40,6 @@ function toFormDefaults(par) {
       itemNo: eq.item_no,
       isMain: eq.is_main,
       equipmentId: eq.equipment_id || "",
-      productId: eq.product_id || "",
       tipo: eq.tipo || "",
       marca: eq.marca || "",
       serial: eq.serial || "",

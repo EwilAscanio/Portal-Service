@@ -27,8 +27,8 @@ CREATE TABLE role (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- "user"
-CREATE TABLE "user" (
+-- users
+CREATE TABLE users (
   id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   login          VARCHAR(60) NOT NULL,
   name           VARCHAR(120) NOT NULL,
@@ -42,13 +42,13 @@ CREATE TABLE "user" (
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX uq_user_login   ON "user" (lower(login));
-CREATE UNIQUE INDEX uq_user_email   ON "user" (lower(email));
-CREATE INDEX        idx_user_role_id ON "user" (role_id);
-CREATE INDEX        idx_user_status ON "user" (status);
+CREATE UNIQUE INDEX uq_user_login   ON users (lower(login));
+CREATE UNIQUE INDEX uq_user_email   ON users (lower(email));
+CREATE INDEX        idx_user_role_id ON users (role_id);
+CREATE INDEX        idx_user_status ON users (status);
 
 CREATE TRIGGER trg_user_set_updated_at
-  BEFORE UPDATE ON "user"
+  BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- Seed: role
@@ -61,7 +61,7 @@ INSERT INTO role (name, description) VALUES
 
 -- Seed: initial user (bcryptjs, 10 rounds)
 -- login: ewil / password: 123456
-INSERT INTO "user" (login, name, email, password_hash, role_id, status, last_access_at)
+INSERT INTO users (login, name, email, password_hash, role_id, status, last_access_at)
 VALUES (
   'ewil',
   'Ewil Ascanio',

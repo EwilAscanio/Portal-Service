@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { notify } from "@/lib/toast";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -136,9 +136,18 @@ export default function ParTemplatesPage() {
         title="Plantillas de PAR"
         description="Modelos reutilizables de ítems para armar un PAR rápidamente."
         actions={
-          <Button icon={Plus} onClick={() => router.push("/par/plantillas/nueva")}>
-            Nueva plantilla
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              icon={ArrowLeft}
+              onClick={() => router.push("/par")}
+            >
+              Par
+            </Button>
+            <Button icon={Plus} onClick={() => router.push("/par/plantillas/nueva")}>
+              Nueva plantilla
+            </Button>
+          </>
         }
       />
 

@@ -8,7 +8,7 @@ CREATE TABLE role (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE "user" (
+CREATE TABLE users (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   login          VARCHAR(60) NOT NULL,
   name           VARCHAR(120) NOT NULL,
@@ -22,10 +22,10 @@ CREATE TABLE "user" (
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX user_login_unique ON "user" (lower(login));
-CREATE UNIQUE INDEX user_email_unique ON "user" (lower(email));
-CREATE INDEX user_role_id_idx ON "user" (role_id);
-CREATE INDEX user_status_idx ON "user" (status);
+CREATE UNIQUE INDEX user_login_unique ON users (lower(login));
+CREATE UNIQUE INDEX user_email_unique ON users (lower(email));
+CREATE INDEX user_role_id_idx ON users (role_id);
+CREATE INDEX user_status_idx ON users (status);
 
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$
@@ -36,7 +36,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER user_set_updated_at
-  BEFORE UPDATE ON "user"
+  BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- Seed: roles
@@ -49,7 +49,7 @@ INSERT INTO role (name, description) VALUES
 
 -- Seed: usuario inicial (password hasheado con bcryptjs, 10 rounds)
 -- login: ewil / password: 123456
-INSERT INTO "user" (login, name, email, password_hash, role_id, status, last_access_at)
+INSERT INTO users (login, name, email, password_hash, role_id, status, last_access_at)
 VALUES (
   'ewil',
   'Ewil Ascanio',

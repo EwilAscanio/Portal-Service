@@ -43,12 +43,13 @@ export async function GET() {
     `);
 
     const upcomingMaintenances = await query(`
-      SELECT id, name AS equipment, client_description AS "client",
-             type AS "type", next_maintenance AS "date"
-      FROM equipment
-      WHERE next_maintenance IS NOT NULL
-        AND next_maintenance >= now()
-      ORDER BY next_maintenance ASC
+      SELECT e.id, e.name AS equipment, c.description AS "client",
+             e.next_maintenance AS "date"
+      FROM equipment e
+      LEFT JOIN client c ON c.id = e.client_id
+      WHERE e.next_maintenance IS NOT NULL
+        AND e.next_maintenance >= now()
+      ORDER BY e.next_maintenance ASC
       LIMIT 4
     `);
 
