@@ -19,6 +19,24 @@ export async function PUT(request, { params }) {
   try {
     const { id } = await params;
     const body = await request.json();
+    const current = await equipmentRepo.findById(id);
+    if (!current) {
+      return NextResponse.json({ error: "Equipo no encontrado" }, { status: 404 });
+    }
+    if (body.clientId && body.clientId !== current.client_id) {
+      const refs = await equipmentRepo.findParRefs(id);
+      if (refs.length > 0) {
+        const lista = refs
+          .map((ref) => `PAR-${ref.par_number} (${ref.status})`)
+          .join(", ");
+        return NextResponse.json(
+          {
+            error: `No se puede cambiar el cliente: el equipo está asociado a PAR(s): ${lista}. Elimina o termina el vínculo antes de reasignarlo.`,
+          },
+          { status: 409 }
+        );
+      }
+    }
     const equipment = await equipmentRepo.update(id, body);
     if (!equipment) {
       return NextResponse.json({ error: "Equipo no encontrado" }, { status: 404 });
