@@ -1,8 +1,19 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const params = request.nextUrl.searchParams;
+    const now = new Date();
+    let year = Number(params.get("year"));
+    let month = Number(params.get("month"));
+    if (!Number.isInteger(year)) year = now.getUTCFullYear();
+    if (!Number.isInteger(month) || month < 1 || month > 12)
+      month = now.getUTCMonth() + 1;
+
+    const monthStart = new Date(Date.UTC(year, month - 1, 1));
+    const nextMonthStart = new Date(Date.UTC(year, month, 1));
+
     const ordersStats = await query(`
       SELECT
         COUNT(*)::int AS total,
@@ -42,16 +53,20 @@ export async function GET() {
       LIMIT 5
     `);
 
-    const upcomingMaintenances = await query(`
+    const upcomingMaintenances = await query(
+      `
       SELECT e.id, e.name AS equipment, c.description AS "client",
              e.next_maintenance AS "date"
       FROM equipment e
       LEFT JOIN client c ON c.id = e.client_id
       WHERE e.next_maintenance IS NOT NULL
-        AND e.next_maintenance >= now()
+        AND e.next_maintenance >= $1
+        AND e.next_maintenance < $2
       ORDER BY e.next_maintenance ASC
-      LIMIT 4
-    `);
+      LIMIT 6
+    `,
+      [monthStart.toISOString(), nextMonthStart.toISOString()]
+    );
 
     const os = ordersStats.rows[0];
     const cs = clientsStats.rows[0];
