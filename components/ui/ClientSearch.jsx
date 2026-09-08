@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Building2, Check, ChevronDown, Pencil, Search, SearchX, X } from "lucide-react";
 import { useClickOutside } from "@/hooks/useClickOutside";
@@ -33,8 +34,10 @@ export function ClientSearch({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(-1);
+  const [dropdownStyle, setDropdownStyle] = useState(null);
   const inputRef = useRef(null);
-  const containerRef = useClickOutside(() => setOpen(false));
+  const dropdownRef = useRef(null);
+  const containerRef = useClickOutside(() => setOpen(false), [dropdownRef]);
 
   const selected = useMemo(
     () => clients.find((client) => client.id === value) ?? null,
@@ -46,6 +49,24 @@ export function ClientSearch({
     if (q.length < 2) return [];
     return clients.filter((client) => matchClient(client, q)).slice(0, 8);
   }, [clients, query]);
+
+  const showResults = open && query.trim().length >= 2 && !disabled;
+
+  useEffect(() => {
+    if (!showResults) return undefined;
+    const update = () => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setDropdownStyle({ top: rect.bottom + 6, left: rect.left, width: rect.width });
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [showResults, containerRef]);
 
   useEffect(() => {
     if (autoFocus && inputRef.current) inputRef.current.focus();
@@ -126,8 +147,6 @@ export function ClientSearch({
     );
   }
 
-  const showResults = open && query.trim().length >= 2 && !disabled;
-
   return (
     <div ref={containerRef} className="relative w-full">
       {label && <span className="mb-1.5 block text-sm font-medium text-foreground">{label}</span>}
@@ -164,61 +183,73 @@ export function ClientSearch({
         )}
       </div>
 
-      <AnimatePresence>
-        {showResults && (
-          <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.98, transition: { duration: 0.12 } }}
-            transition={{ duration: 0.16, ease: "easeOut" }}
-            className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-border bg-surface shadow-xl shadow-black/5 dark:shadow-black/40"
-          >
-            {results.length === 0 ? (
-              <div className="flex items-center gap-3 px-4 py-6 text-sm text-muted">
-                <SearchX className="h-4 w-4 shrink-0" />
-                Sin resultados para “{query.trim()}”
-              </div>
-            ) : (
-              <ul className="max-h-72 overflow-y-auto p-1.5">
-                {results.map((client, index) => {
-                  const active = index === highlighted;
-                  return (
-                    <li key={client.id}>
-                      <button
-                        type="button"
-                        onMouseDown={(event) => {
-                          event.preventDefault();
-                          handleSelect(client);
-                        }}
-                        onMouseEnter={() => setHighlighted(index)}
-                        className={cn(
-                          "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors",
-                          active ? "bg-surface-2" : "hover:bg-surface-2"
-                        )}
-                      >
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                          <Building2 className="h-4 w-4" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-foreground">
-                            {client.description || "—"}
-                          </span>
-                          <span className="block truncate text-xs text-muted">
-                            {client.codclie}
-                          </span>
-                        </span>
-                        {active && (
-                          <Check className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {showResults && dropdownStyle && (
+              <motion.div
+                ref={dropdownRef}
+                initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.98, transition: { duration: 0.12 } }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                style={{
+                  position: "fixed",
+                  top: dropdownStyle.top,
+                  left: dropdownStyle.left,
+                  width: dropdownStyle.width,
+                  zIndex: 90,
+                }}
+                className="overflow-hidden rounded-2xl border border-border bg-surface shadow-xl shadow-black/5 dark:shadow-black/40"
+              >
+                {results.length === 0 ? (
+                  <div className="flex items-center gap-3 px-4 py-6 text-sm text-muted">
+                    <SearchX className="h-4 w-4 shrink-0" />
+                    Sin resultados para “{query.trim()}”
+                  </div>
+                ) : (
+                  <ul className="max-h-72 overflow-y-auto p-1.5">
+                    {results.map((client, index) => {
+                      const active = index === highlighted;
+                      return (
+                        <li key={client.id}>
+                          <button
+                            type="button"
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              handleSelect(client);
+                            }}
+                            onMouseEnter={() => setHighlighted(index)}
+                            className={cn(
+                              "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors",
+                              active ? "bg-surface-2" : "hover:bg-surface-2"
+                            )}
+                          >
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                              <Building2 className="h-4 w-4" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium text-foreground">
+                                {client.description || "—"}
+                              </span>
+                              <span className="block truncate text-xs text-muted">
+                                {client.codclie}
+                              </span>
+                            </span>
+                            {active && (
+                              <Check className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </motion.div>
             )}
-          </motion.div>
+          </AnimatePresence>,
+          document.body
         )}
-      </AnimatePresence>
       {error && <p className="mt-1.5 text-xs font-medium text-red-500">{error}</p>}
     </div>
   );

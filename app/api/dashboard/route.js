@@ -16,7 +16,7 @@ export async function GET() {
 
     const clientsStats = await query(`
       SELECT COUNT(*)::int AS total,
-             COUNT(*) FILTER (WHERE status = 'Activo')::int AS active
+             COUNT(*) FILTER (WHERE status = '1')::int AS active
       FROM client
     `);
 

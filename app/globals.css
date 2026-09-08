@@ -78,6 +78,15 @@ body {
   background: transparent;
 }
 
+/* Oculta las barras de scroll (login y paneles que encajan al viewport) */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Focus visible accesible */
 :focus-visible {
   outline: 2px solid var(--ring);

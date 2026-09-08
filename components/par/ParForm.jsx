@@ -634,7 +634,7 @@ export function ParForm({
                   {itemFields.map((field, index) => {
                     const item = items[index] ?? {};
                     return (
-                      <tr key={field.id} className="border-b border-border/60 align-top last:border-0">
+                      <tr key={field.id} className="border-b border-border/60 align-middle last:border-0">
                         <td className="px-2 py-2 text-muted">{index + 1}</td>
                         <td className="px-2 py-2">
                           <div className="w-64">
@@ -674,42 +674,47 @@ export function ParForm({
                         </td>
                         <td className="px-2 py-2">
                           <Input
-                            className="w-16"
+                            className="w-16 text-xs!"
                             placeholder="0"
-                            {...form.register(`items.${index}.qty`)}
+                            inputMode="numeric"
+                            value={items[index]?.qty ?? ""}
+                            onChange={(event) => {
+                              const clean = event.target.value.replace(/[^\d]/g, "");
+                              form.setValue(`items.${index}.qty`, clean);
+                            }}
                           />
                         </td>
                         <td className="px-2 py-2">
                           <Input
-                            className="w-14"
+                            className="w-14 text-xs!"
                             placeholder="—"
                             {...form.register(`items.${index}.ccn`)}
                           />
                         </td>
                         <td className="px-2 py-2">
                           <Input
-                            className="w-20"
+                            className="w-20 text-xs!"
                             placeholder="—"
                             {...form.register(`items.${index}.usList`)}
                           />
                         </td>
                         <td className="px-2 py-2">
                           <Input
-                            className="w-16"
+                            className="w-16 text-xs!"
                             placeholder="1"
                             {...form.register(`items.${index}.multiplicador`)}
                           />
                         </td>
                         <td className="px-2 py-2">
                           <Input
-                            className="w-20"
+                            className="w-20 text-xs!"
                             placeholder="0.00"
                             {...form.register(`items.${index}.valorUnitUsd`)}
                           />
                         </td>
                         <td className="px-2 py-2">
                           <Input
-                            className="w-16"
+                            className="w-16 text-xs!"
                             placeholder="0"
                             {...form.register(`items.${index}.valorPercent`)}
                           />

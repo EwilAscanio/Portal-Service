@@ -78,7 +78,7 @@ export function LoginForm({ onSubmit }) {
         label="Usuario"
         type="text"
         icon={User}
-        placeholder="tu.usuario"
+        placeholder="Usuario"
         autoComplete="username"
         error={errors.login?.message}
         {...register("login", { onChange: handleFieldChange("login") })}

@@ -410,7 +410,7 @@ export default function EquiposPage() {
             ? "Modifica los datos del equipo."
             : "Registra maquinaria en el inventario."
         }
-        size="lg"
+        size="xl"
         footer={
           <>
             <Button
@@ -477,7 +477,7 @@ export default function EquiposPage() {
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4">
             <ClientSearch
               clients={clients}
               value={form.clientId}
@@ -488,15 +488,15 @@ export default function EquiposPage() {
               }}
               error={errors.clientId}
             />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <Input
               label="Ubicación"
               placeholder="Planta principal"
               value={form.location}
               onChange={setField("location")}
             />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
             <Select
               label="Estado"
               value={form.status}
@@ -506,6 +506,9 @@ export default function EquiposPage() {
                 label: status,
               }))}
             />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <Input
               label="Último mantenimiento"
               type="date"

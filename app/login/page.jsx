@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { signIn, useSession } from "next-auth/react";
@@ -42,7 +43,7 @@ const STATS = [
 /** Panel de marca con ilustración industrial abstracta */
 function BrandPanel() {
   return (
-    <aside className="relative hidden overflow-hidden bg-[#0a1120] lg:flex lg:flex-col lg:justify-between lg:p-12">
+    <aside className="relative hidden overflow-hidden bg-[#0a1120] lg:flex lg:flex-col lg:p-8 xl:p-12">
       {/* Fondo: rejilla + brillos */}
       <div className="bg-grid absolute inset-0 opacity-60" aria-hidden="true" />
       <motion.div
@@ -82,13 +83,13 @@ function BrandPanel() {
           <Cog className="h-6 w-6 text-white" />
         </span>
         <div>
-          <p className="text-base font-bold tracking-tight text-white">Maquitech</p>
+          <p className="text-base font-bold tracking-tight text-white">Portal Service</p>
           <p className="text-xs text-slate-400">Gestión Industrial Inteligente</p>
         </div>
       </div>
 
       {/* Propuesta de valor */}
-      <div className="relative max-w-lg">
+      <div className="relative mt-8 min-h-0 flex-1 max-w-lg overflow-y-auto scrollbar-hide">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -172,31 +173,40 @@ export default function LoginPage() {
   if (status === "loading" || session) return <PageLoader label="Redirigiendo al panel" />;
 
   return (
-    <main className="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
+    <main className="grid h-screen overflow-hidden lg:grid-cols-[1.05fr_1fr]">
       <BrandPanel />
 
-      <section className="relative flex items-center justify-center bg-background px-4 py-10 sm:px-8">
+      <section className="relative min-h-0 overflow-y-auto bg-background px-4 py-5 sm:px-8 scrollbar-hide">
         <div className="absolute right-4 top-4 sm:right-6 sm:top-6">
           <ThemeToggle />
         </div>
 
+        <div className="flex min-h-full">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full max-w-md"
+          className="m-auto w-full max-w-md"
         >
-          {/* Marca en móvil */}
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/25">
-              <Cog className="h-6 w-6 text-white" />
-            </span>
-            <div>
-              <p className="text-base font-bold tracking-tight text-foreground">
-                Maquitech
-              </p>
-              <p className="text-xs text-muted">Gestión Industrial Inteligente</p>
-            </div>
+          {/* Logo */}
+          <div className="mb-3 flex justify-center lg:hidden">
+            <Image
+              src="/Logo.png"
+              alt="Logo Maquitech"
+              width={2167}
+              height={726}
+              className="h-auto w-72 object-contain"
+            />
+          </div>
+          <div className="mb-12 hidden justify-center lg:flex">
+            <Image
+              src="/Logo.png"
+              alt="Logo Maquitech"
+              width={2167}
+              height={726}
+              className="h-auto w-72 object-contain"
+              priority
+            />
           </div>
 
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
@@ -206,14 +216,15 @@ export default function LoginPage() {
             Inicia sesión para acceder al panel de control de Maquitech.
           </p>
 
-          <div className="mt-8">
+          <div className="mt-6">
             <LoginForm onSubmit={handleLogin} />
           </div>
 
-          <p className="mt-10 text-center text-xs text-muted">
-            © 2026 Maquitech S.A.S. — Todos los derechos reservados.
+          <p className="mt-6 text-center text-xs text-muted">
+            © 2026 Maquitech Distribuidores C.A. — Todos los derechos reservados.
           </p>
         </motion.div>
+        </div>
       </section>
     </main>
   );
