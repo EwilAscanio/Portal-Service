@@ -129,7 +129,7 @@ export function ParCardGrid({ pars, loading, onView, onNavigate, onApprove, onDe
                     variants={PAR_STATUS_VARIANTS}
                   />
                 </div>
-                <p className="line-clamp-2 text-sm font-medium text-foreground">
+                <p className="truncate text-sm font-medium text-foreground" title={par.client_name || "—"}>
                   {par.client_name || "—"}
                 </p>
 

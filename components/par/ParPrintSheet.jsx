@@ -178,12 +178,8 @@ export function ParPrintSheet({ par }) {
           </div>
 
           {/* Totales */}
-          <div className="mb-4 divide-y divide-slate-800 border border-slate-800 text-xs">
-            <div className="grid grid-cols-12 divide-x divide-slate-800 font-bold">
-              <div className="col-span-8 bg-slate-100 p-1.5 text-right uppercase">SUB-TOTAL BsS</div>
-              <div className="col-span-4 p-1.5 text-right font-mono">-</div>
-            </div>
-            <div className="grid grid-cols-12 divide-x divide-slate-800 bg-slate-200 font-bold">
+          <div className="mb-4 border border-slate-800 text-xs">
+            <div className="grid grid-cols-12 bg-slate-200 font-bold">
               <div className="col-span-6 p-2 text-right text-sm uppercase">TOTAL</div>
               <div className="col-span-3 p-2 text-right font-mono text-sm text-indigo-950">
                 $ {formatNumber(totalUsd)}

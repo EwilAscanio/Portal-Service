@@ -23,6 +23,7 @@ export const Input = forwardRef(function Input(
     trailing,
     id,
     className,
+    containerClassName,
     ...props
   },
   ref
@@ -31,7 +32,7 @@ export const Input = forwardRef(function Input(
   const inputId = id ?? autoId;
 
   return (
-    <div className="w-full">
+    <div className={cn("w-full", containerClassName)}>
       {label && (
         <label
           htmlFor={inputId}

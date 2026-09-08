@@ -637,7 +637,7 @@ export function ParForm({
                       <tr key={field.id} className="border-b border-border/60 align-middle last:border-0">
                         <td className="px-2 py-2 text-muted">{index + 1}</td>
                         <td className="px-2 py-2">
-                          <div className="w-64">
+                          <div className="w-56">
                             <CatalogSearch
                               options={itemProducts}
                               value={form.watch(`items.${index}.productId`)}
@@ -667,14 +667,14 @@ export function ParForm({
                         </td>
                         <td className="px-2 py-2">
                           <Input
-                            className="min-w-80 text-xs!"
+                            className="w-72! text-xs!"
                             placeholder="Descripción"
                             {...form.register(`items.${index}.descripcion`)}
                           />
                         </td>
                         <td className="px-2 py-2">
                           <Input
-                            className="w-16 text-xs!"
+                            className="w-16! text-xs!"
                             placeholder="0"
                             inputMode="numeric"
                             value={items[index]?.qty ?? ""}
@@ -686,37 +686,53 @@ export function ParForm({
                         </td>
                         <td className="px-2 py-2">
                           <Input
-                            className="w-14 text-xs!"
+                            className="w-14! text-xs!"
                             placeholder="—"
                             {...form.register(`items.${index}.ccn`)}
                           />
                         </td>
                         <td className="px-2 py-2">
                           <Input
-                            className="w-20 text-xs!"
+                            className="w-20! text-xs!"
                             placeholder="—"
                             {...form.register(`items.${index}.usList`)}
                           />
                         </td>
                         <td className="px-2 py-2">
                           <Input
-                            className="w-16 text-xs!"
+                            className="w-16! text-xs!"
                             placeholder="1"
-                            {...form.register(`items.${index}.multiplicador`)}
+                            inputMode="decimal"
+                            value={items[index]?.multiplicador ?? ""}
+                            onChange={(event) => {
+                              const clean = event.target.value
+                                .replace(/[^\d.]/g, "")
+                                .replace(/(\..*)\./g, "$1")
+                                .replace(/\.(\d{2})\d+/g, ".$1");
+                              form.setValue(`items.${index}.multiplicador`, clean);
+                            }}
                           />
                         </td>
                         <td className="px-2 py-2">
                           <Input
-                            className="w-20 text-xs!"
+                            className="w-20! text-xs!"
                             placeholder="0.00"
                             {...form.register(`items.${index}.valorUnitUsd`)}
                           />
                         </td>
                         <td className="px-2 py-2">
                           <Input
-                            className="w-16 text-xs!"
+                            className="w-16! text-xs!"
                             placeholder="0"
-                            {...form.register(`items.${index}.valorPercent`)}
+                            inputMode="decimal"
+                            value={items[index]?.valorPercent ?? ""}
+                            onChange={(event) => {
+                              const clean = event.target.value
+                                .replace(/[^\d.]/g, "")
+                                .replace(/(\..*)\./g, "$1")
+                                .replace(/\.(\d{2})\d+/g, ".$1");
+                              form.setValue(`items.${index}.valorPercent`, clean);
+                            }}
                           />
                         </td>
                         <td className="whitespace-nowrap px-2 py-2 font-semibold text-blue-600 dark:text-blue-400">

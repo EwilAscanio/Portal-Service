@@ -57,7 +57,18 @@ export function ClientSearch({
     const update = () => {
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
-      setDropdownStyle({ top: rect.bottom + 6, left: rect.left, width: rect.width });
+      const gap = 6;
+      const spaceBelow = window.innerHeight - rect.bottom - gap;
+      const spaceAbove = rect.top - gap;
+      const openUp = spaceBelow < 240 && spaceAbove > spaceBelow;
+      const maxHeight = Math.max(140, Math.min(Math.max(spaceBelow, spaceAbove) - 4, 288));
+      setDropdownStyle({
+        top: openUp ? undefined : rect.bottom + gap,
+        bottom: openUp ? window.innerHeight - rect.top + gap : undefined,
+        left: rect.left,
+        width: rect.width,
+        maxHeight,
+      });
     };
     update();
     window.addEventListener("resize", update);
@@ -196,6 +207,7 @@ export function ClientSearch({
                 style={{
                   position: "fixed",
                   top: dropdownStyle.top,
+                  bottom: dropdownStyle.bottom,
                   left: dropdownStyle.left,
                   width: dropdownStyle.width,
                   zIndex: 90,
@@ -208,7 +220,10 @@ export function ClientSearch({
                     Sin resultados para “{query.trim()}”
                   </div>
                 ) : (
-                  <ul className="max-h-72 overflow-y-auto p-1.5">
+                  <ul
+                    className="overflow-y-auto p-1.5"
+                    style={{ maxHeight: dropdownStyle.maxHeight }}
+                  >
                     {results.map((client, index) => {
                       const active = index === highlighted;
                       return (
