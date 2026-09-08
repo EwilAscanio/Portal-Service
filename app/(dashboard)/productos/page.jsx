@@ -28,7 +28,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/utils/cn";
 
-const CATEGORIES = ["Todos", "Principal", "Servicio", "Repuestos"];
+const CATEGORIES = ["Todos", "Servicio", "Repuestos"];
 
 const EMPTY_FORM = {
   code: "",
@@ -39,7 +39,7 @@ const EMPTY_FORM = {
   modelo: "",
   cost: "",
   price: "",
-  category: "Principal",
+  category: "Servicio",
   stock: "",
   status: "Activo",
 };
@@ -130,7 +130,7 @@ export default function ProductosPage() {
       modelo: product.modelo ?? "",
       cost: product.cost ?? "",
       price: product.price ?? "",
-      category: product.category ?? "Principal",
+      category: product.category ?? "Servicio",
       stock: product.stock ?? "",
       status: product.status ?? "Activo",
     });
@@ -269,7 +269,7 @@ export default function ProductosPage() {
       header: "Categoría",
       sortable: true,
       render: (row) => {
-        const variants = { Principal: "info", Servicio: "purple", Repuestos: "warning" };
+        const variants = { Servicio: "purple", Repuestos: "warning" };
         return <Badge variant={variants[row.category] || "neutral"}>{row.category}</Badge>;
       },
     },
@@ -409,7 +409,7 @@ export default function ProductosPage() {
             ? "Modifica los datos del producto."
             : "Completa los campos para agregar un producto al catálogo."
         }
-        size="lg"
+        size="2xl"
         footer={
           <>
             <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={saving}>
@@ -432,15 +432,27 @@ export default function ProductosPage() {
             </div>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-4">
             <Input
               label="Código"
               placeholder="EQP-001"
+              containerClassName="sm:col-span-1"
               value={form.code}
               error={errors.code}
               onChange={setField("code")}
               disabled={Boolean(editing)}
             />
+            <Input
+              label="Descripción"
+              placeholder="Nombre o descripción del producto"
+              containerClassName="sm:col-span-3"
+              value={form.description}
+              error={errors.description}
+              onChange={setField("description")}
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-4">
             <Select
               label="Tipo"
               value={form.type}
@@ -451,17 +463,6 @@ export default function ProductosPage() {
                 { value: "Servicio", label: "Servicio" },
               ]}
             />
-          </div>
-
-          <Input
-            label="Descripción"
-            placeholder="Nombre o descripción del producto"
-            value={form.description}
-            error={errors.description}
-            onChange={setField("description")}
-          />
-
-          <div className="grid gap-4 sm:grid-cols-2">
             <Input
               label="Marca"
               placeholder="Ingelsonrand"
@@ -474,29 +475,25 @@ export default function ProductosPage() {
               onChange={setField("category")}
               error={errors.category}
               options={[
-                { value: "Principal", label: "Principal" },
                 { value: "Servicio", label: "Servicio" },
                 { value: "Repuestos", label: "Repuestos" },
               ]}
             />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
             <Input
               label="Serial"
               placeholder="IR998231"
               value={form.serial}
               onChange={setField("serial")}
             />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-4">
             <Input
               label="Modelo"
               placeholder="NIRVANA 150"
               value={form.modelo}
               onChange={setField("modelo")}
             />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
             <Input
               label="Costo ($)"
               type="number"
@@ -531,16 +528,18 @@ export default function ProductosPage() {
           </div>
 
           {editing && (
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">Estado</label>
-              <select
-                value={form.status}
-                onChange={setField("status")}
-                className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-foreground transition-colors hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 focus:outline-none dark:hover:border-slate-600"
-              >
-                <option value="Activo">Activo</option>
-                <option value="Inactivo">Inactivo</option>
-              </select>
+            <div className="grid gap-4 sm:grid-cols-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground">Estado</label>
+                <select
+                  value={form.status}
+                  onChange={setField("status")}
+                  className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-foreground transition-colors hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 focus:outline-none dark:hover:border-slate-600"
+                >
+                  <option value="Activo">Activo</option>
+                  <option value="Inactivo">Inactivo</option>
+                </select>
+              </div>
             </div>
           )}
         </form>

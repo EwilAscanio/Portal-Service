@@ -27,7 +27,6 @@ import { cn } from "@/utils/cn";
 const PAGE_SIZE = 12;
 
 const CATEGORY_VARIANTS = {
-  Principal: "info",
   Servicio: "purple",
   Repuestos: "warning",
 };
@@ -309,7 +308,7 @@ export function ProductCardGrid({
         <Modal
           open={Boolean(viewProduct)}
           onClose={() => setViewProduct(null)}
-          size="lg"
+          size="2xl"
           title={viewProduct.description}
           description={`Código ${viewProduct.code}`}
           footer={
@@ -330,35 +329,26 @@ export function ProductCardGrid({
           }
         >
           <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <ReadonlyField label="Código">
+            <div className="grid gap-4 sm:grid-cols-4">
+              <ReadonlyField label="Código" className="sm:col-span-1">
                 <span className="font-mono text-xs font-semibold text-blue-600 dark:text-blue-400">
                   {viewProduct.code}
                 </span>
               </ReadonlyField>
-              <ReadonlyField label="Tipo">{viewProduct.type || "—"}</ReadonlyField>
+              <ReadonlyField label="Descripción" className="sm:col-span-3">
+                {viewProduct.description}
+              </ReadonlyField>
             </div>
 
-            <ReadonlyField label="Descripción">
-              {viewProduct.description}
-            </ReadonlyField>
-
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-4">
+              <ReadonlyField label="Tipo">{viewProduct.type || "—"}</ReadonlyField>
               <ReadonlyField label="Marca">{viewProduct.brand || "—"}</ReadonlyField>
               <ReadonlyField label="Categoría">{viewProduct.category}</ReadonlyField>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
               <ReadonlyField label="Serial">{viewProduct.serial || "—"}</ReadonlyField>
-              <ReadonlyField label="Modelo">{viewProduct.modelo || "—"}</ReadonlyField>
             </div>
 
-            <div
-              className={cn(
-                "grid gap-4",
-                canEditCost ? "sm:grid-cols-3" : "sm:grid-cols-2"
-              )}
-            >
+            <div className="grid gap-4 sm:grid-cols-4">
+              <ReadonlyField label="Modelo">{viewProduct.modelo || "—"}</ReadonlyField>
               {canEditCost && (
                 <ReadonlyField label="Costo ($)">
                   {formatCurrency(viewProduct.cost)}
@@ -372,19 +362,15 @@ export function ProductCardGrid({
               <ReadonlyField label="Existencia">{viewProduct.stock}</ReadonlyField>
             </div>
 
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Estado
-              </label>
-              <Badge
-                variant={viewProduct.status === "Activo" ? "success" : "danger"}
-                dot
-              >
-                {viewProduct.status}
-              </Badge>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-4">
+              <ReadonlyField label="Estado">
+                <Badge
+                  variant={viewProduct.status === "Activo" ? "success" : "danger"}
+                  dot
+                >
+                  {viewProduct.status}
+                </Badge>
+              </ReadonlyField>
               <ReadonlyField label="Creado">
                 {viewProduct.created_at
                   ? formatDate(viewProduct.created_at, {
