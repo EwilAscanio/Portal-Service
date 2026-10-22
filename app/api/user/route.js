@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { findAll, create, existsByLoginOrEmail } from "@/lib/repositories/user.repository";
+import { auth } from "@/auth";
+import { findAll, create, existsByLoginOrEmail, findRoleById } from "@/lib/repositories/user.repository";
+import { userSchema } from "@/lib/validators";
+import { isSuperAdmin, ROLES } from "@/lib/permissions";
 
 export async function GET() {
   try {
@@ -11,30 +14,25 @@ export async function GET() {
     return NextResponse.json({ error: "Error al cargar usuarios." }, { status: 500 });
   }
 }
-
 export async function POST(request) {
   try {
-    const body = await request.json();
-    const { login, name, email, password, roleId, status } = body;
-
-    if (!login?.trim() || !name?.trim() || !email?.trim() || !password || !roleId) {
-      return NextResponse.json(
-        { error: "Faltan campos obligatorios: login, name, email, password, roleId." },
-        { status: 400 }
-      );
+    const session = await auth();
+    if (!session) return NextResponse.json({ error: "No autenticado." }, { status: 401 });
+    const parsed = userSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message || "Datos de usuario inválidos." }, { status: 400 });
     }
-
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: "La contraseña debe tener al menos 6 caracteres." },
-        { status: 400 }
-      );
+    const { login, name, email, password, roleId, status } = parsed.data;
+    const targetRole = await findRoleById(roleId);
+    if (!targetRole) return NextResponse.json({ error: "Rol no encontrado." }, { status: 400 });
+    if (targetRole.name === ROLES.SUPER_ADMIN && !isSuperAdmin(session.user.role)) {
+      return NextResponse.json({ error: "Solo un Superadministrador puede asignar este rol." }, { status: 403 });
     }
 
     const conflict = await existsByLoginOrEmail({ login, email });
     const errors = [];
-    if (conflict.login_taken) errors.push("El usuario ya está registrado.");
-    if (conflict.email_taken) errors.push("El correo ya está registrado.");
+    if (conflict.login_taken) errors.push("El usuario ya estÃ¡ registrado.");
+    if (conflict.email_taken) errors.push("El correo ya estÃ¡ registrado.");
     if (errors.length) {
       return NextResponse.json({ error: errors.join(" ") }, { status: 409 });
     }

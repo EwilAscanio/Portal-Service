@@ -14,6 +14,7 @@ import { notify } from "@/lib/toast";
 import { useSidebarStore } from "@/stores/sidebarStore";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/utils/cn";
+import { canAccessRole } from "@/lib/permissions";
 
 /* ------------------------------------------------------------------ */
 /*  Sidebar hooks (compat layer with sidebarStore)                     */
@@ -90,7 +91,7 @@ function SidebarContent({ collapsed = false, indicatorId, onNavigate }) {
   const visibleHrefs = [
     ...NAV_SECTIONS.flatMap((section) =>
       section.items
-        .filter((item) => !item.roles || item.roles.includes(userRole))
+        .filter((item) => !item.roles || canAccessRole(userRole, item.roles))
         .map((item) => item.href)
     ),
     ...ACCOUNT_ITEMS.map((item) => item.href),
@@ -137,7 +138,7 @@ function SidebarContent({ collapsed = false, indicatorId, onNavigate }) {
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
         {NAV_SECTIONS.map((section) => {
           const visibleItems = section.items.filter(
-            (item) => !item.roles || item.roles.includes(userRole)
+            (item) => !item.roles || canAccessRole(userRole, item.roles)
           );
           if (visibleItems.length === 0) return null;
           return (

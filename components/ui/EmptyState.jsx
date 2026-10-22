@@ -33,3 +33,10 @@ export function EmptyState({
     </motion.div>
   );
 }
+
+export function PermissionState({
+  title = "Acceso restringido",
+  description = "No tienes permisos para ver este módulo.",
+}) {
+  return <EmptyState title={title} description={description} />;
+}

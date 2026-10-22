@@ -2,9 +2,15 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import * as parRepo from "@/lib/repositories/par.repository";
 import { parItemsUpdateSchema, parStatusSchema } from "@/lib/validators";
+import { canReviewPar, getParEditError } from "@/lib/par-policy";
+import { getParErrorResponse } from "@/lib/par-errors";
 
 const MANUAL_STATUSES = ["Creado", "Aprobado", "Rechazado"];
-const ITEM_EDITABLE_STATUSES = ["Creado", "Aprobado"];
+
+function parErrorResponse(error) {
+  const response = getParErrorResponse(error);
+  return response ? NextResponse.json({ error: response.error }, { status: response.status }) : null;
+}
 
 export async function GET(request, { params }) {
   try {
@@ -24,6 +30,10 @@ export async function GET(request, { params }) {
 
 export async function PUT(request, { params }) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
     const { id } = await params;
     const existing = await parRepo.findById(Number(id));
 
@@ -31,12 +41,11 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: "PAR no encontrado" }, { status: 404 });
     }
 
-    if (!ITEM_EDITABLE_STATUSES.includes(existing.status)) {
-      return NextResponse.json(
-        { error: "Solo se pueden editar los ítems de un PAR en estado Creado o Aprobado" },
-        { status: 403 }
-      );
-    }
+    const editError = getParEditError(existing.status, {
+      role: session.user.role,
+      hasActiveOrders: Number(existing.total_orders ?? 0) > 0,
+    });
+    if (editError) return parErrorResponse(editError);
 
     const body = await request.json();
     const parsed = parItemsUpdateSchema.safeParse(body);
@@ -47,11 +56,13 @@ export async function PUT(request, { params }) {
       );
     }
 
-    await parRepo.update(Number(id), { items: parsed.data.items });
+    await parRepo.update(Number(id), { items: parsed.data.items }, { role: session.user.role });
     const updated = await parRepo.findById(Number(id));
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error al actualizar PAR:", error);
+    const response = parErrorResponse(error);
+    if (response) return response;
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }
@@ -81,6 +92,13 @@ export async function PATCH(request, { params }) {
 
     const { status } = parsed.data;
 
+    if (["Aprobado", "Rechazado"].includes(status) && !canReviewPar(session.user.role)) {
+      return NextResponse.json(
+        { error: "Solo Administrador y Supervisor pueden aprobar o rechazar un PAR" },
+        { status: 403 }
+      );
+    }
+
     if (status === existing.status) {
       return NextResponse.json(existing);
     }
@@ -107,6 +125,8 @@ export async function PATCH(request, { params }) {
     );
   } catch (error) {
     console.error("Error al actualizar estado del PAR:", error);
+    const response = parErrorResponse(error);
+    if (response) return response;
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }
@@ -131,6 +151,8 @@ export async function DELETE(request, { params }) {
     return NextResponse.json({ message: "PAR eliminado" });
   } catch (error) {
     console.error("Error al eliminar PAR:", error);
+    const response = parErrorResponse(error);
+    if (response) return response;
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }

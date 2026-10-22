@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useSyncExternalStore, useState } from "react";
+import { useEffect, useSyncExternalStore, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -13,7 +13,6 @@ import {
   DollarSign,
   Download,
   Plus,
-  Wrench,
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useAuth } from "@/hooks/useAuth";
@@ -35,9 +34,8 @@ import { DataTable } from "@/components/tables/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Avatar } from "@/components/ui/Avatar";
-import { Select } from "@/components/ui/Select";
 import { ORDER_STATUS_VARIANTS } from "@/lib/status";
-import { formatCurrency, formatDate, getGreeting } from "@/lib/format";
+import { formatDate, getGreeting } from "@/lib/format";
 
 /* Fecha del cliente solo tras la hidratación (evita mismatch servidor/cliente) */
 const EMPTY_SUBSCRIBE = () => () => {};
@@ -47,40 +45,6 @@ function getClientNow() {
   if (typeof window === "undefined") return null;
   if (clientNow === null) clientNow = new Date();
   return clientNow;
-}
-
-const MESES = [
-  "Enero",
-  "Febrero",
-  "Marzo",
-  "Abril",
-  "Mayo",
-  "Junio",
-  "Julio",
-  "Agosto",
-  "Septiembre",
-  "Octubre",
-  "Noviembre",
-  "Diciembre",
-];
-
-function monthKeyOf(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function monthOptionsFrom(anchor) {
-  const startIdx = anchor.getFullYear() * 12 + (anchor.getMonth() - 1);
-  const options = [];
-  for (let i = 0; i < 7; i++) {
-    const idx = startIdx + i;
-    const year = Math.floor(idx / 12);
-    const month = idx % 12;
-    options.push({
-      value: `${year}-${String(month + 1).padStart(2, "0")}`,
-      label: `${MESES[month]} ${year}`,
-    });
-  }
-  return options;
 }
 
 /* Gráficos con carga diferida: reducen el JS inicial de la página */
@@ -134,17 +98,6 @@ const recentOrderColumns = [
     className: "hidden lg:table-cell",
     render: (row) => formatDate(row.scheduled),
   },
-  {
-    key: "amount",
-    header: "Monto",
-    sortable: false,
-    className: "text-right",
-    render: (row) => (
-      <span className="font-semibold text-foreground">
-        {formatCurrency(row.amount)}
-      </span>
-    ),
-  },
 ];
 
 export default function DashboardPage() {
@@ -156,47 +109,21 @@ export default function DashboardPage() {
   const now = useSyncExternalStore(EMPTY_SUBSCRIBE, getClientNow, () => null);
 
   const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [monthKey, setMonthKey] = useState(null);
-  const autoMonthRef = useRef(true);
 
   useEffect(() => {
-    const base = getClientNow() ?? new Date();
-    autoMonthRef.current = true;
-    setMonthKey(monthKeyOf(base));
-    const timer = setInterval(() => {
-      if (autoMonthRef.current) setMonthKey(monthKeyOf(new Date()));
-    }, 60_000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!monthKey) return;
     async function fetchStats() {
-      setLoading(true);
       try {
-        const [year, month] = monthKey.split("-").map(Number);
-        setStats(await getDashboard({ month, year }));
+        setStats(await getDashboard());
       } catch {
         // Silenciar error, mostrar zeros
-      } finally {
-        setLoading(false);
       }
     }
     fetchStats();
-  }, [monthKey]);
-
-  const handleMonthChange = (value) => {
-    autoMonthRef.current = false;
-    setMonthKey(value);
-  };
-
-  const monthOptions = monthOptionsFrom(getClientNow() ?? new Date());
+  }, []);
 
   const firstName = user?.name?.split(" ")[0] ?? "Usuario";
   const activeOrders = stats?.kpis?.orders?.inProgress ?? 0;
   const topTechnicians = [];
-  const upcomingMaintenances = stats?.upcomingMaintenances ?? [];
   const recentOrders = stats?.recentOrders ?? [];
   const kpis = [
     { id: "orders", label: "Órdenes", value: stats?.kpis?.orders?.total ?? 0, hint: "Servicios totales", icon: ClipboardList, tone: "blue" },
@@ -240,23 +167,25 @@ export default function DashboardPage() {
               {now ? getGreeting(now) : ""}, {firstName}
             </h1>
             <p className="mt-2 max-w-md text-sm leading-relaxed text-blue-100/90">
-              Hay <strong className="text-white">{activeOrders} órdenes activas</strong> y{" "}
-              <strong className="text-white">{upcomingMaintenances.length} mantenimientos</strong> programados
-              para este mes.
+              Hay <strong className="text-white">{activeOrders} órdenes activas</strong> en
+              este momento.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              variant="accent"
-              icon={Plus}
-              onClick={() => router.push("/ordenes")}
-            >
-              Nueva Orden
-            </Button>
-            <Button variant="glass" icon={Download} onClick={handleExport}>
-              Exportar
-            </Button>
-          </div>
+<div className="flex flex-wrap gap-3">
+              <Button
+                variant="accent"
+                icon={Plus}
+                onClick={() => router.push("/ordenes")}
+              >
+                Nueva Orden
+              </Button>
+              <Button variant="glass" icon={Download} onClick={handleExport}>
+                Exportar
+              </Button>
+              <Button variant="secondary" icon={Plus} onClick={() => router.push("/par/new")}>
+                Crear Par
+              </Button>
+            </div>
         </div>
       </motion.section>
 
@@ -270,68 +199,14 @@ export default function DashboardPage() {
       </Stagger>
 
       {/* Gráficos principales */}
-      <Stagger className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <FadeInUp className="xl:col-span-2">
+      <Stagger className="grid grid-cols-1 gap-6">
+        <FadeInUp>
           <ChartCard
             title="Facturación mensual"
             description="Ingresos vs. egresos del año en curso"
           >
             <RevenueLineChart />
           </ChartCard>
-        </FadeInUp>
-        <FadeInUp>
-          <Card>
-            <CardHeader>
-              <div>
-                <CardTitle>Próximos mantenimientos</CardTitle>
-                <CardDescription>Agenda del mes</CardDescription>
-              </div>
-              <Select
-                className="w-40"
-                value={monthKey ?? ""}
-                onChange={(e) => handleMonthChange(e.target.value)}
-              >
-                {monthOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
-            </CardHeader>
-            <CardContent className="space-y-1 pt-2">
-              {loading ? (
-                <div className="rounded-xl border border-dashed border-border bg-surface-2/40 px-4 py-6 text-center text-sm text-muted">
-                  Cargando mantenimientos…
-                </div>
-              ) : upcomingMaintenances.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border bg-surface-2/40 px-4 py-6 text-center text-sm text-muted">
-                  No hay mantenimientos programados para este mes.
-                </div>
-              ) : (
-                upcomingMaintenances.map((maintenance) => (
-                  <div
-                    key={maintenance.id}
-                    className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-surface-2/60"
-                  >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500">
-                      <Wrench className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {maintenance.equipment}
-                      </p>
-                      <p className="truncate text-xs text-muted">
-                        {maintenance.client}
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-xs font-semibold capitalize text-muted">
-                      {formatDate(maintenance.date, { day: "2-digit", month: "short" })}
-                    </span>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
         </FadeInUp>
       </Stagger>
 
@@ -395,7 +270,7 @@ export default function DashboardPage() {
                   No hay órdenes recientes para mostrar.
                 </div>
               ) : (
-                <DataTable columns={recentOrderColumns} rows={recentOrders} />
+                <DataTable columns={recentOrderColumns} data={recentOrders} />
               )}
             </CardContent>
           </Card>

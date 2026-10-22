@@ -13,6 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useAuth } from "@/hooks/useAuth";
 import { notify } from "@/lib/toast";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -21,6 +22,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ConfirmDialog } from "@/components/ui/Modal";
 import { FadeInUp } from "@/components/ui/animated";
 import { PAR_STATUS_VARIANTS } from "@/lib/status";
+import { getParEditError } from "@/lib/par-policy";
 import { ParForm } from "@/components/par/ParForm";
 import { ParPreview } from "@/components/par/ParPreview";
 import { ParPrintSheet } from "@/components/par/ParPrintSheet";
@@ -29,7 +31,8 @@ import { getParById, updatePar, updateParStatus, deletePar } from "@/lib/api";
 function toFormDefaults(par) {
   return {
     clientId: par.client_id || "",
-    atencion: par.atencion || "",
+    plantId: par.plant_id || "",
+    contactId: par.contact_id || "",
     fechaEmision: par.fecha_emision
       ? String(par.fecha_emision).slice(0, 10)
       : new Date().toISOString().split("T")[0],
@@ -48,6 +51,8 @@ function toFormDefaults(par) {
     })),
     items: (par.items ?? []).map((item) => ({
       itemNo: item.item_no,
+      sourceItemId: item.id,
+      requiresTechnician: item.requires_technician,
       productId: item.product_id || "",
       descripcion: item.descripcion || "",
       qty: item.qty?.toString() ?? "",
@@ -64,6 +69,7 @@ function toFormDefaults(par) {
 export default function ParDetailPage() {
   const { id } = useParams();
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
 
   const [par, setPar] = useState(null);
   const [notFound, setNotFound] = useState(false);
@@ -97,6 +103,7 @@ export default function ParDetailPage() {
   useEffect(() => { load(); }, [load]);
 
   const handleSave = async (payload) => {
+    if (!canEditItems) return;
     try {
       setSaving(true);
       const updated = await updatePar(id, { items: payload.items });
@@ -109,6 +116,10 @@ export default function ParDetailPage() {
       notify.error("Error al guardar", {
         description: err.response?.data?.error || err.message,
       });
+      if (err.response?.status === 403) {
+        setView("preview");
+        await load();
+      }
     } finally {
       setSaving(false);
     }
@@ -145,7 +156,7 @@ export default function ParDetailPage() {
     }
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return <Card><CardContent className="py-10 text-center text-sm text-muted">Cargando…</CardContent></Card>;
   }
 
@@ -163,7 +174,12 @@ export default function ParDetailPage() {
   }
 
   const status = par.display_status ?? par.status;
-  const canEditItems = ["Creado", "Aprobado"].includes(status);
+  const editError = getParEditError(par.status, {
+    role: user?.role,
+    hasActiveOrders: Number(par.total_orders ?? 0) > 0,
+  });
+  const canEditItems = Boolean(user) && !editError;
+  const editingItems = canEditItems && view === "items";
   const canReject = ["Creado", "Aprobado"].includes(status);
 
   return (
@@ -182,21 +198,21 @@ export default function ParDetailPage() {
             {canEditItems && (
               <Button
                 variant="secondary"
-                icon={view === "preview" ? Pencil : Eye}
-                onClick={() => setView(view === "preview" ? "items" : "preview")}
+                icon={editingItems ? Eye : Pencil}
+                onClick={() => setView(editingItems ? "preview" : "items")}
               >
-                {view === "preview" ? "Editar ítems" : "Vista previa"}
+                {editingItems ? "Vista previa" : "Editar ítems"}
               </Button>
             )}
             <Button variant="secondary" icon={ArrowLeft} onClick={() => router.push("/par")}>
               Volver
             </Button>
-            {view === "preview" && (
+            {!editingItems && (
               <Button variant="secondary" icon={Printer} onClick={() => window.print()}>
                 Imprimir / Guardar PDF
               </Button>
             )}
-            {view === "items" && (
+            {editingItems && (
               <Button
                 type="submit"
                 form="par-items-form"
@@ -229,8 +245,12 @@ export default function ParDetailPage() {
         }
       />
 
+      {editError && par.status === "Aprobado" && (
+        <p className="print:hidden text-sm text-muted" role="status">{editError.message}</p>
+      )}
+
       <FadeInUp className="print:hidden">
-        {view === "items" ? (
+        {editingItems ? (
           <ParForm
             formId="par-items-form"
             variant="items"
@@ -244,7 +264,7 @@ export default function ParDetailPage() {
         )}
       </FadeInUp>
 
-      {view === "preview" && <ParPrintSheet par={par} />}
+      {!editingItems && <ParPrintSheet par={par} />}
 
       <ConfirmDialog
         open={toReject}

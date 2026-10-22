@@ -38,6 +38,9 @@ export async function PUT(request, { params }) {
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error al actualizar plantilla de PAR:", error);
+    if (error.code === "PAR_TEMPLATE_PRODUCT_INVALID") {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }

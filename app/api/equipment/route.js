@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import * as equipmentRepo from "@/lib/repositories/equipment.repository";
+import { equipmentSchema } from "@/lib/validators";
 
 export async function GET(request) {
   try {
@@ -8,8 +9,9 @@ export async function GET(request) {
     const status = searchParams.get("status") || undefined;
     const search = searchParams.get("search") || undefined;
     const clientId = searchParams.get("clientId") || undefined;
+    const plantId = searchParams.get("plantId") || undefined;
 
-    const equipment = await equipmentRepo.findAll({ status, search, clientId });
+    const equipment = await equipmentRepo.findAll({ status, search, clientId, plantId });
     return NextResponse.json(equipment);
   } catch (error) {
     console.error("Error al listar equipos:", error);
@@ -17,27 +19,25 @@ export async function GET(request) {
   }
 }
 
-async function clientExists(clientId) {
-  const { rows } = await query("SELECT 1 FROM client WHERE id = $1", [clientId]);
+async function clientAndPlantExist(clientId, plantId) {
+  const { rows } = await query(
+    `SELECT 1 FROM client c
+     LEFT JOIN plant p ON p.client_id = c.id AND p.id = $2
+     WHERE c.id = $1 AND c.status = '1' AND ($2::uuid IS NULL OR p.id IS NOT NULL)`,
+    [clientId, plantId || null]
+  );
   return rows.length > 0;
 }
 
 export async function POST(request) {
   try {
-    const body = await request.json();
-    const { name, brand, model, serial, clientId, location, status, lastMaintenance, nextMaintenance } = body;
+    const parsed = equipmentSchema.safeParse(await request.json());
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "Datos inválidos" }, { status: 400 });
+    const { name, brand, model, serial, clientId, plantId, location, consortium, hp, pressure, status } = parsed.data;
 
-    if (!name || !brand || !model || !serial) {
-      return NextResponse.json({ error: "Faltan campos obligatorios" }, { status: 400 });
-    }
-
-    if (!clientId) {
-      return NextResponse.json({ error: "El cliente es obligatorio" }, { status: 400 });
-    }
-
-    const exists = await clientExists(clientId);
+    const exists = await clientAndPlantExist(clientId, plantId);
     if (!exists) {
-      return NextResponse.json({ error: "El cliente seleccionado no existe" }, { status: 400 });
+      return NextResponse.json({ error: "El cliente no existe o la planta no le pertenece." }, { status: 400 });
     }
 
     const equipment = await equipmentRepo.create({
@@ -46,10 +46,12 @@ export async function POST(request) {
       model,
       serial,
       clientId,
+      plantId,
       location,
+      consortium,
+      hp,
+      pressure,
       status,
-      lastMaintenance,
-      nextMaintenance,
     });
 
     return NextResponse.json(equipment, { status: 201 });

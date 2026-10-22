@@ -51,8 +51,8 @@ export function ParPrintSheet({ par }) {
               <div className="col-span-10 p-1.5 font-bold uppercase">{par.client_name}</div>
             </div>
             <div className="grid grid-cols-12 divide-x divide-slate-800">
-              <div className="col-span-2 bg-slate-100 p-1.5 text-[11px] uppercase">ATENCION:</div>
-              <div className="col-span-6 p-1.5 font-bold uppercase">{par.atencion}</div>
+              <div className="col-span-2 bg-slate-100 p-1.5 text-[11px] uppercase">CONTACTO:</div>
+              <div className="col-span-6 p-1.5 font-bold uppercase">{par.contact_name}</div>
               <div className="col-span-2 bg-slate-100 p-1.5 text-center text-[11px] uppercase">
                 FECHA
               </div>
@@ -60,14 +60,18 @@ export function ParPrintSheet({ par }) {
             </div>
             <div className="grid grid-cols-12 divide-x divide-slate-800">
               <div className="col-span-2 bg-slate-100 p-1.5 text-[11px] uppercase">TELEFONO:</div>
-              <div className="col-span-6 p-1.5 font-medium">{par.client_phone || "—"}</div>
+              <div className="col-span-6 p-1.5 font-medium">{par.contact_phone || par.client_phone || "—"}</div>
               <div className="col-span-4 bg-slate-50 p-1.5 text-center text-[10px] font-bold italic text-slate-700">
                 CÓDIGO INTERNO: PAR-{par.par_number}
               </div>
             </div>
             <div className="grid grid-cols-12 divide-x divide-slate-800">
               <div className="col-span-2 bg-slate-100 p-1.5 text-[11px] uppercase">DIRECCION:</div>
-              <div className="col-span-10 p-1.5 font-medium uppercase">{par.client_address}</div>
+              <div className="col-span-10 p-1.5 font-medium uppercase">{par.plant_address || par.client_address}</div>
+            </div>
+            <div className="grid grid-cols-12 divide-x divide-slate-800">
+              <div className="col-span-2 bg-slate-100 p-1.5 text-[11px] uppercase">PLANTA:</div>
+              <div className="col-span-10 p-1.5 font-bold uppercase">{par.plant_name || "—"}</div>
             </div>
           </div>
 
@@ -84,7 +88,7 @@ export function ParPrintSheet({ par }) {
                   <th className="border-r border-slate-800 p-1 text-center">Marca</th>
                   <th className="border-r border-slate-800 p-1 text-center">SERIAL</th>
                   <th className="border-r border-slate-800 p-1 text-center">MODELO</th>
-                  <th className="p-1 text-center">Observaciones</th>
+                  <th className="p-1 text-center">Descripción del trabajo a realizar</th>
                 </tr>
               </thead>
               <tbody>
@@ -178,6 +182,7 @@ export function ParPrintSheet({ par }) {
           </div>
 
           {/* Totales */}
+          <div className="mb-3 rounded border border-current/20 p-3 text-sm"><strong>Total de horas presupuestadas: {Number(par.budgeted_hours || 0).toFixed(2)} h</strong><p className="text-xs">Suma de cantidades de mano de obra; horas compartidas entre técnicos.</p></div>
           <div className="mb-4 border border-slate-800 text-xs">
             <div className="grid grid-cols-12 bg-slate-200 font-bold">
               <div className="col-span-6 p-2 text-right text-sm uppercase">TOTAL</div>

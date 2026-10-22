@@ -1,17 +1,9 @@
-/**
- * Funciones de cálculo y formato para el módulo Par.
- */
+import { calculateLineTotalUsd as calculateLineTotalUsdPure } from "../lib/par-calculation.js";
+
+/** Funciones de cálculo y formato para el módulo PAR. */
 
 export function calculateLineTotalUsd(item) {
-  if (item.qty === "" || item.qty == null || Number(item.qty) <= 0) return 0;
-  if (item.valorUnitUsd === "" || item.valorUnitUsd == null || Number(item.valorUnitUsd) < 0) return 0;
-  const mult =
-    item.multiplicador && item.multiplicador > 0 ? Number(item.multiplicador) : 1;
-  const percent =
-    item.valorPercent !== "" && item.valorPercent != null && Number(item.valorPercent) > 0
-      ? Number(item.valorPercent)
-      : 0;
-  return Number((Number(item.qty) * Number(item.valorUnitUsd) * mult * (1 + percent / 100)).toFixed(2));
+  return calculateLineTotalUsdPure(item);
 }
 
 export function calculateLineTotalBs(item, exchangeRate) {

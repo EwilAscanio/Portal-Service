@@ -1,0 +1,13 @@
+export function LaborAllocationSummary({ order }) {
+  const rows = order.labor_allocations || [];
+  const confirmed = Boolean(order.closed_at);
+  return <section className="space-y-2">
+    <h3 className="text-sm font-semibold">Horas por renglón y técnico</h3>
+    {order.labor_review_required ? <p className="text-sm">{order.status === "Cancelada" ? "Orden cancelada con horas anteriores sin distribución registrada." : "Pendiente de revisar la distribución de horas anteriores."}</p> : !rows.length ? <p className="text-sm">Sin horas presupuestadas asignadas.</p> :
+      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr><th className="p-2">Renglón del PAR</th><th className="p-2">Técnico</th><th className="p-2 text-right">Estimadas</th>{confirmed && <><th className="p-2 text-right">Reales</th><th className="p-2 text-right">Diferencia</th><th className="p-2">Observación</th></>}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} className="border-t border-border"><td className="p-2">{row.source_item_no}. {row.description}<span className="block text-xs">{row.product_code}</span></td><td className="p-2">{row.technician_name}</td><td className="p-2 text-right">{Number(row.hours).toFixed(2)}</td>{confirmed && <><td className="p-2 text-right">{Number(row.actual_hours).toFixed(2)}</td><td className="p-2 text-right">{(Number(row.actual_hours) - Number(row.hours)).toFixed(2)}</td><td className="p-2">{row.actual_note || "—"}</td></>}</tr>)}</tbody></table></div>}
+    {confirmed && <div className="space-y-1 text-xs"><p>Horas reales confirmadas: {Number(order.actual_hours).toFixed(2)} h. Cierre por {order.closed_by_name || "usuario registrado"} el {new Date(order.closed_at).toLocaleString("es-VE")}.</p>{order.excess_reason && <p>Justificación del exceso: {order.excess_reason}</p>}{order.closure_notes && <p>Observaciones del cierre: {order.closure_notes}</p>}</div>}
+    {order.closure_legacy && <p className="text-xs">Orden completada antes del control de cierre. No tiene horas reales confirmadas.</p>}
+    {order.legacy_worked_hours != null && <p className="text-xs">Registro anterior: {Number(order.legacy_worked_hours).toFixed(2)} h.{order.labor_reviewed_at ? ` Revisado por ${order.labor_reviewed_by_name || "usuario registrado"} el ${new Date(order.labor_reviewed_at).toLocaleString("es-VE")}. ${order.labor_review_note}` : order.status === "Cancelada" ? " Orden cancelada: no consume presupuesto." : " Distribución pendiente de revisión."}</p>}
+    {order.status === "Cancelada" && !!rows.length && <p className="text-xs">Asignaciones históricas de una orden cancelada; estas horas están liberadas.</p>}
+  </section>;
+}

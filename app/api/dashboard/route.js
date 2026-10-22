@@ -1,19 +1,8 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 
-export async function GET(request) {
+export async function GET() {
   try {
-    const params = request.nextUrl.searchParams;
-    const now = new Date();
-    let year = Number(params.get("year"));
-    let month = Number(params.get("month"));
-    if (!Number.isInteger(year)) year = now.getUTCFullYear();
-    if (!Number.isInteger(month) || month < 1 || month > 12)
-      month = now.getUTCMonth() + 1;
-
-    const monthStart = new Date(Date.UTC(year, month - 1, 1));
-    const nextMonthStart = new Date(Date.UTC(year, month, 1));
-
     const ordersStats = await query(`
       SELECT
         COUNT(*)::int AS total,
@@ -33,8 +22,7 @@ export async function GET(request) {
 
     const equipmentStats = await query(`
       SELECT COUNT(*)::int AS total,
-             COUNT(*) FILTER (WHERE status = 'Operativo')::int AS operational,
-             COUNT(*) FILTER (WHERE next_maintenance <= now() + interval '7 day')::int AS upcoming
+             COUNT(*) FILTER (WHERE status = 'Operativo')::int AS operational
       FROM equipment
     `);
 
@@ -45,28 +33,23 @@ export async function GET(request) {
     `);
 
     const recentOrders = await query(`
-      SELECT id, order_code AS "orderCode", client_description AS "client",
-             equipment_name AS "equipment", type, technician_name AS "technician",
-             priority, status, scheduled_date AS "scheduled", amount
-      FROM service_order
-      ORDER BY created_at DESC
+      SELECT so.id, so.order_code AS "orderCode", ph.par_number AS "parNumber",
+             c.description AS "client", COALESCE(e.name, so.equipment_name) AS "equipment",
+             COALESCE((SELECT string_agg(t.name, ', ' ORDER BY sot.is_lead DESC, sot.assigned_at)
+               FROM service_order_technician sot JOIN technical t ON t.id = sot.technical_id
+               WHERE sot.service_order_id = so.id), so.technician_name) AS "technician",
+             p.name AS "plant", ct.name AS "contact",
+             so.service_type AS "type", so.priority, so.status,
+             so.scheduled_start AS "scheduled", so.amount
+      FROM service_order so
+      JOIN par_header ph ON ph.id = so.par_id
+      JOIN client c ON c.id = ph.client_id
+      JOIN plant p ON p.id = ph.plant_id
+      LEFT JOIN equipment e ON e.id = so.equipment_id
+      JOIN contact ct ON ct.id = ph.contact_id
+      ORDER BY so.created_at DESC
       LIMIT 5
     `);
-
-    const upcomingMaintenances = await query(
-      `
-      SELECT e.id, e.name AS equipment, c.description AS "client",
-             e.next_maintenance AS "date"
-      FROM equipment e
-      LEFT JOIN client c ON c.id = e.client_id
-      WHERE e.next_maintenance IS NOT NULL
-        AND e.next_maintenance >= $1
-        AND e.next_maintenance < $2
-      ORDER BY e.next_maintenance ASC
-      LIMIT 6
-    `,
-      [monthStart.toISOString(), nextMonthStart.toISOString()]
-    );
 
     const os = ordersStats.rows[0];
     const cs = clientsStats.rows[0];
@@ -78,7 +61,7 @@ export async function GET(request) {
         orders: { total: os.total, pending: os.pending, inProgress: os.in_progress },
         clients: { total: cs.total, active: cs.active },
         technicians: { total: ts.total, active: ts.active },
-        equipment: { total: es.total, operational: es.operational, upcoming: es.upcoming },
+        equipment: { total: es.total, operational: es.operational },
         revenue: os.revenue,
       },
       ordersByStatus: [
@@ -88,7 +71,6 @@ export async function GET(request) {
         { name: "Canceladas", value: os.cancelled, color: "#ef4444" },
       ],
       recentOrders: recentOrders.rows,
-      upcomingMaintenances: upcomingMaintenances.rows,
     });
   } catch (error) {
     console.error("Error al obtener stats del dashboard:", error);

@@ -8,7 +8,7 @@ export async function GET() {
     return NextResponse.json(paises);
   } catch (error) {
     console.error("[GET /api/ubicaciones/paises]", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Error al cargar países." }, { status: 500 });
   }
 }
 
@@ -19,6 +19,6 @@ export async function POST() {
     return NextResponse.json({ message: `Se sincronizaron ${count} países.`, count });
   } catch (error) {
     console.error("[POST /api/ubicaciones/paises]", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Error al sincronizar países." }, { status: 500 });
   }
 }

@@ -5,6 +5,7 @@ import {
   setStatus,
   existsByCedula,
 } from "@/lib/repositories/technical.repository";
+import { technicalSchema } from "@/lib/validators";
 
 export async function GET(_request, { params }) {
   const { id } = await params;
@@ -23,15 +24,9 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: "Técnico no encontrado." }, { status: 404 });
     }
 
-    const body = await request.json();
-    const { cedula, name, phone, email, status } = body;
-
-    if (!cedula?.trim() || !name?.trim()) {
-      return NextResponse.json(
-        { error: "Faltan campos obligatorios: cedula, name." },
-        { status: 400 }
-      );
-    }
+    const parsed = technicalSchema.safeParse(await request.json());
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "Datos inválidos" }, { status: 400 });
+    const { cedula, name, phone, email, status, userId } = parsed.data;
 
     const taken = await existsByCedula(cedula.trim(), id);
     if (taken) {
@@ -42,15 +37,17 @@ export async function PUT(request, { params }) {
     }
 
     const updated = await update(id, {
-      cedula: cedula.trim(),
-      name: name.trim(),
-      phone: phone?.trim() || null,
-      email: email?.trim() || null,
-      status: status || existing.status,
+      cedula,
+      name,
+      phone: phone || null,
+      email: email || null,
+      status,
+      userId: userId || null,
     });
 
     return NextResponse.json(updated);
   } catch (error) {
+    if (error.code === "23505") return NextResponse.json({ error: "El usuario seleccionado ya está asociado a otro técnico." }, { status: 409 });
     return NextResponse.json({ error: "Error al actualizar el técnico." }, { status: 500 });
   }
 }

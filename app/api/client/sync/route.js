@@ -1,68 +1,47 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { fetchClientsFromSaint } from "@/lib/saint-api";
-import { upsertMany, getExistingStatusMap, getAllCodclies } from "@/lib/repositories/client.repository";
+import { beginSaintSync, failSaintSync, syncManyFromSaint } from "@/lib/repositories/client.repository";
+import { normalizeSaintClientStatus } from "@/lib/saint-status";
 
 export async function POST() {
+  let runId;
   try {
+    const session = await auth();
+    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+
     const saintClients = await fetchClientsFromSaint();
-
-    const mapped = saintClients.map((c) => ({
-      codclie:     String(c.CodClie || ""),
-      description: c.Descrip || null,
-      rif:         c.ID3 || null,
-      address1:    c.Direc1 || null,
-      address2:    c.Direc2 || null,
-      status:      String(c.Activo ?? "1"),
-      country:     c.Pais != null ? String(c.Pais) : null,
-      state:       c.Estado != null ? String(c.Estado) : null,
-      phone:       c.Telef || null,
-      email:       c.Email || null,
-      mobile:      c.Movil || null,
-    }));
-
-    const existingCodclies = await getAllCodclies();
-    const existingSet = new Set(existingCodclies);
-
-    const existingStatuses = await getExistingStatusMap();
-
-    let inserted = 0;
-    let updated = 0;
-    let activated = 0;
-    let deactivated = 0;
-
-    for (const c of mapped) {
-      if (!existingSet.has(c.codclie)) {
-        inserted++;
-      } else {
-        updated++;
-        const previousStatus = existingStatuses[c.codclie];
-        if (previousStatus === "0" && c.status === "1") activated++;
-        if (previousStatus === "1" && c.status === "0") deactivated++;
-      }
+    if (!Array.isArray(saintClients) || saintClients.length === 0) {
+      throw new Error("Saint devolvió un catálogo de clientes vacío o inválido.");
     }
+    const mapped = saintClients.map((item) => ({
+      codclie: String(item.CodClie || "").trim(),
+      description: item.Descrip || null,
+      rif: item.ID3 || null,
+      address1: item.Direc1 || null,
+      address2: item.Direc2 || null,
+      status: normalizeSaintClientStatus(item.Activo),
+      country: item.Pais != null ? String(item.Pais) : null,
+      state: item.Estado != null ? String(item.Estado) : null,
+      phone: item.Telef || null,
+      email: item.Email || null,
+      mobile: item.Movil || null,
+    }));
+    if (mapped.some((item) => !item.codclie)) throw new Error("Saint devolvió clientes sin código.");
+    const codes = mapped.map((item) => item.codclie);
+    if (new Set(codes).size !== codes.length) throw new Error("Saint devolvió códigos de cliente duplicados.");
 
-    await upsertMany(mapped);
-
-    const parts = [];
-    parts.push(`${mapped.length} procesados`);
-    if (inserted > 0) parts.push(`${inserted} nuevos`);
-    if (updated > 0) parts.push(`${updated} actualizados`);
-    if (activated > 0) parts.push(`${activated} activados`);
-    if (deactivated > 0) parts.push(`${deactivated} desactivados`);
-
-    return NextResponse.json({
-      count: mapped.length,
-      inserted,
-      updated,
-      activated,
-      deactivated,
-      message: `Se sincronizaron ${parts.join(", ")}.`,
-    });
+    runId = await beginSaintSync(mapped.length);
+    const stats = await syncManyFromSaint(mapped, runId);
+    const parts = [`${mapped.length} procesados`];
+    if (stats.inserted) parts.push(`${stats.inserted} nuevos`);
+    if (stats.updated) parts.push(`${stats.updated} actualizados`);
+    if (stats.activated) parts.push(`${stats.activated} activados`);
+    if (stats.deactivated) parts.push(`${stats.deactivated} desactivados`);
+    return NextResponse.json({ count: mapped.length, ...stats, runId, message: `Se sincronizaron ${parts.join(", ")}.` });
   } catch (error) {
-    console.error("[POST /api/clients/sync]", error);
-    return NextResponse.json(
-      { error: error.message || "Error al sincronizar clientes desde Saint." },
-      { status: 500 }
-    );
+    if (runId) await failSaintSync(runId, String(error)).catch(() => {});
+    console.error("[POST /api/client/sync]", error);
+    return NextResponse.json({ error: "Error al sincronizar clientes desde Saint." }, { status: 500 });
   }
 }

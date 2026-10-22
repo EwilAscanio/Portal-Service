@@ -2,17 +2,23 @@
 
 import { useState } from "react";
 import {
+  Barcode,
+  Boxes,
   Building2,
-  CalendarClock,
   ChevronLeft,
   ChevronRight,
+  CircleCheck,
   Cog,
   Factory,
+  Gauge,
+  Handshake,
   Hash,
   Inbox,
   MapPin,
   Pencil,
+  Tag,
   Trash2,
+  Zap,
 } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -24,7 +30,6 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Stagger, FadeInUp } from "@/components/ui/animated";
 import { Modal } from "@/components/ui/Modal";
-import { formatDate } from "@/lib/format";
 import { cn } from "@/utils/cn";
 import { EQUIPMENT_STATUS_VARIANTS } from "@/lib/status";
 
@@ -173,21 +178,20 @@ export function EquipmentCardGrid({
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Factory className="h-3 w-3 shrink-0 text-blue-500" />
+                    <span className="w-16 shrink-0 text-muted">Planta</span>
+                    <span className="truncate text-foreground">{row.plant_name || "—"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Cog className="h-3 w-3 shrink-0 text-blue-500" />
+                    <span className="w-16 shrink-0 text-muted">Potencia</span>
+                    <span className="truncate text-foreground">{row.hp != null ? `${row.hp} HP` : "—"} · {row.pressure != null ? `${row.pressure} PSI` : "—"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <MapPin className="h-3 w-3 shrink-0 text-blue-500" />
                     <span className="w-16 shrink-0 text-muted">Ubicación</span>
                     <span className="truncate text-foreground">
                       {row.location || "—"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CalendarClock className="h-3 w-3 shrink-0 text-blue-500" />
-                    <span className="w-16 shrink-0 text-muted">
-                      Próx. mto.
-                    </span>
-                    <span className="truncate text-foreground">
-                      {row.next_maintenance
-                        ? formatDate(row.next_maintenance)
-                        : "—"}
                     </span>
                   </div>
                 </div>
@@ -272,9 +276,9 @@ export function EquipmentCardGrid({
         <Modal
           open={Boolean(viewEquipment)}
           onClose={() => setViewEquipment(null)}
-          size="lg"
-          title={viewEquipment.name}
-          description={`Serial ${viewEquipment.serial}`}
+          size="2xl"
+          title="Detalle de equipo"
+          description="Información del equipo."
           footer={
             <>
               <Button variant="secondary" onClick={() => setViewEquipment(null)}>
@@ -293,51 +297,35 @@ export function EquipmentCardGrid({
           }
         >
           <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <ReadonlyField label="Marca">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <ReadonlyField label="Tipo de Equipo" icon={Cog} className="sm:col-span-2 lg:col-span-2">
+                {viewEquipment.name || "—"}
+              </ReadonlyField>
+              <ReadonlyField label="Marca" icon={Tag}>
                 {viewEquipment.brand || "—"}
               </ReadonlyField>
-              <ReadonlyField label="Modelo">
+              <ReadonlyField label="Modelo" icon={Boxes}>
                 {viewEquipment.model || "—"}
               </ReadonlyField>
             </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <ReadonlyField label="Serial">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <ReadonlyField label="Cliente" icon={Building2} className="sm:col-span-2 lg:col-span-2">
+                {viewEquipment.client_name || "—"}
+              </ReadonlyField>
+              <ReadonlyField label="Planta" icon={Factory}>{viewEquipment.plant_name || "—"}</ReadonlyField>
+              <ReadonlyField label="Serial" icon={Barcode}>
                 <span className="font-mono text-xs">
                   {viewEquipment.serial || "—"}
                 </span>
               </ReadonlyField>
-              <ReadonlyField label="Cliente">
-                {viewEquipment.client_name || "—"}
-              </ReadonlyField>
             </div>
-
-            <ReadonlyField label="Ubicación">
-              {viewEquipment.location || "—"}
-            </ReadonlyField>
-
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Estado
-              </label>
-              <StatusBadge
-                status={viewEquipment.status}
-                variants={EQUIPMENT_STATUS_VARIANTS}
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <ReadonlyField label="Último mantenimiento">
-                {viewEquipment.last_maintenance
-                  ? formatDate(viewEquipment.last_maintenance)
-                  : "—"}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <ReadonlyField label="Estado" icon={CircleCheck}>
+                <StatusBadge status={viewEquipment.status} variants={EQUIPMENT_STATUS_VARIANTS} />
               </ReadonlyField>
-              <ReadonlyField label="Próximo mantenimiento">
-                {viewEquipment.next_maintenance
-                  ? formatDate(viewEquipment.next_maintenance)
-                  : "—"}
-              </ReadonlyField>
+              <ReadonlyField label="Consorcio" icon={Handshake}>{viewEquipment.consortium || "—"}</ReadonlyField>
+              <ReadonlyField label="Potencia (HP)" icon={Zap}>{viewEquipment.hp ?? "—"}</ReadonlyField>
+              <ReadonlyField label="Presión (PSI)" icon={Gauge}>{viewEquipment.pressure ?? "—"}</ReadonlyField>
             </div>
           </div>
         </Modal>

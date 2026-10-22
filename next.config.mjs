@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ["exceljs"],
+  // 10 MB por archivo más multipart; la ruta limita el cuerpo a 11 MB.
+  experimental: { proxyClientMaxBodySize: "12mb" },
   async headers() {
     return [
       {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import * as parRepo from "@/lib/repositories/par.repository";
 import { parHeaderSchema, parSearchSchema } from "@/lib/validators";
+import { getParErrorResponse } from "@/lib/par-errors";
 
 export async function GET(request) {
   try {
@@ -45,6 +46,8 @@ export async function POST(request) {
     return NextResponse.json(header, { status: 201 });
   } catch (error) {
     console.error("Error al crear PAR:", error);
+    const parError = getParErrorResponse(error);
+    if (parError) return NextResponse.json({ error: parError.error }, { status: parError.status });
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }

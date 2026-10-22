@@ -5,6 +5,7 @@ import {
   setStatus,
   existsByCode,
 } from "@/lib/repositories/product.repository";
+import { productSchema } from "@/lib/validators";
 
 export async function GET(_request, { params }) {
   const { id } = await params;
@@ -23,30 +24,11 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: "Producto no encontrado." }, { status: 404 });
     }
 
-    const body = await request.json();
-    const { code, description, type, brand, serial, modelo, cost, price, category, stock, status } = body;
+    const parsed = productSchema.safeParse(await request.json());
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "Datos inválidos" }, { status: 400 });
+    const { code, description, brand, serial, modelo, cost, price, category, stock, status, requiresTechnician } = parsed.data;
 
-    if (!code?.trim() || !description?.trim() || !type?.trim() || cost == null || price == null || !category?.trim()) {
-      return NextResponse.json(
-        { error: "Faltan campos obligatorios: code, description, type, cost, price, category." },
-        { status: 400 }
-      );
-    }
-
-    if (Number(cost) < 0 || Number(price) < 0) {
-      return NextResponse.json(
-        { error: "El costo y el precio no pueden ser negativos." },
-        { status: 400 }
-      );
-    }
-
-    if (stock != null && Number(stock) < 0) {
-      return NextResponse.json(
-        { error: "La existencia no puede ser negativa." },
-        { status: 400 }
-      );
-    }
-
+    if ((requiresTechnician ?? existing.requires_technician) && category !== "Servicio") return NextResponse.json({ error: "Solo los servicios pueden requerir técnico." }, { status: 400 });
     const taken = await existsByCode({ code: code.trim(), excludeId: id });
     if (taken) {
       return NextResponse.json(
@@ -56,17 +38,17 @@ export async function PUT(request, { params }) {
     }
 
     const updated = await update(id, {
-      code: code.trim(),
-      description: description.trim(),
-      type: type.trim(),
-      brand: brand?.trim() || null,
-      serial: serial?.trim() || null,
-      modelo: modelo?.trim() || null,
-      cost: Number(cost),
-      price: Number(price),
-      category: category.trim(),
-      stock: stock != null ? Number(stock) : existing.stock,
-      status: status || existing.status,
+      code,
+      description,
+      brand: brand || null,
+      serial: serial || null,
+      modelo: modelo || null,
+      cost,
+      price,
+      category,
+      requiresTechnician,
+      stock,
+      status,
     });
 
     return NextResponse.json(updated);

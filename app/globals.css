@@ -130,3 +130,26 @@ body {
     background-color: #ffffff !important;
   }
 }
+
+/* Calendario de técnicos: FullCalendar adopta los tokens visuales del portal. */
+.mq-technician-calendar {
+  --fc-border-color: var(--border);
+  --fc-page-bg-color: var(--surface);
+  --fc-neutral-bg-color: var(--surface-2);
+  --fc-list-event-hover-bg-color: var(--surface-2);
+  --fc-today-bg-color: rgb(37 99 235 / 0.07);
+  --fc-now-indicator-color: #f97316;
+  color: var(--foreground);
+}
+.mq-technician-calendar .fc .fc-toolbar { gap: 0.75rem; flex-wrap: wrap; }
+.mq-technician-calendar .fc .fc-toolbar-title { font-size: 1rem; font-weight: 700; text-transform: capitalize; }
+.mq-technician-calendar .fc .fc-button { border-radius: 0.65rem; font-size: 0.75rem; font-weight: 600; box-shadow: none; }
+.mq-technician-calendar .fc .fc-col-header-cell-cushion,
+.mq-technician-calendar .fc .fc-timegrid-axis-cushion,
+.mq-technician-calendar .fc .fc-timegrid-slot-label-cushion { color: var(--muted); font-size: 0.75rem; }
+.mq-technician-calendar .fc .fc-event { border-radius: 0.5rem; cursor: pointer; padding: 1px; }
+.mq-technician-calendar .fc .mq-calendar-conflict { box-shadow: 0 0 0 2px #ef4444, 0 0 0 4px rgb(239 68 68 / 0.18); }
+@media (max-width: 720px) {
+  .mq-technician-calendar .fc .fc-toolbar { align-items: stretch; flex-direction: column; }
+  .mq-technician-calendar .fc .fc-toolbar-chunk { display: flex; justify-content: center; }
+}

@@ -2,12 +2,19 @@
 
 import { useState } from "react";
 import {
+  Barcode,
+  Boxes,
   ChevronLeft,
   ChevronRight,
-  Cog,
+  CircleCheck,
+  DollarSign,
   Factory,
+  FileText,
+  Hash,
   Inbox,
+  Layers,
   Pencil,
+  Tag,
   Tags,
   ToggleLeft,
   ToggleRight,
@@ -21,7 +28,7 @@ import { ReadonlyField } from "@/components/ui/ReadonlyField";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { Stagger, FadeInUp } from "@/components/ui/animated";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency } from "@/lib/format";
 import { cn } from "@/utils/cn";
 
 const PAGE_SIZE = 12;
@@ -151,6 +158,7 @@ export function ProductCardGrid({
                 </p>
 
                 {/* Detalles */}
+                {product.requires_technician && <span className="text-xs font-medium text-blue-600">Mano de obra · requiere técnico</span>}
                 <div className="space-y-1.5 border-y border-border py-2 text-xs">
                   <div className="flex items-center gap-2">
                     <Tags className="h-3 w-3 shrink-0 text-blue-500" />
@@ -160,13 +168,6 @@ export function ProductCardGrid({
                     >
                       {product.category}
                     </Badge>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Cog className="h-3 w-3 shrink-0 text-blue-500" />
-                    <span className="w-14 shrink-0 text-muted">Tipo</span>
-                    <span className="truncate font-medium text-foreground">
-                      {product.type || "—"}
-                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Factory className="h-3 w-3 shrink-0 text-blue-500" />
@@ -309,8 +310,8 @@ export function ProductCardGrid({
           open={Boolean(viewProduct)}
           onClose={() => setViewProduct(null)}
           size="2xl"
-          title={viewProduct.description}
-          description={`Código ${viewProduct.code}`}
+          title="Detalle de producto"
+          description="Información del producto."
           footer={
             <>
               <Button variant="secondary" onClick={() => setViewProduct(null)}>
@@ -329,41 +330,36 @@ export function ProductCardGrid({
           }
         >
           <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-4">
-              <ReadonlyField label="Código" className="sm:col-span-1">
-                <span className="font-mono text-xs font-semibold text-blue-600 dark:text-blue-400">
-                  {viewProduct.code}
-                </span>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <ReadonlyField label="Código" icon={Hash}>
+                {viewProduct.code}
               </ReadonlyField>
-              <ReadonlyField label="Descripción" className="sm:col-span-3">
+              <ReadonlyField label="Descripción" icon={FileText} className="sm:col-span-1 lg:col-span-3">
                 {viewProduct.description}
               </ReadonlyField>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-4">
-              <ReadonlyField label="Tipo">{viewProduct.type || "—"}</ReadonlyField>
-              <ReadonlyField label="Marca">{viewProduct.brand || "—"}</ReadonlyField>
-              <ReadonlyField label="Categoría">{viewProduct.category}</ReadonlyField>
-              <ReadonlyField label="Serial">{viewProduct.serial || "—"}</ReadonlyField>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <ReadonlyField label="Marca" icon={Factory} className="sm:col-span-2 lg:col-span-2">{viewProduct.brand || "—"}</ReadonlyField>
+              <ReadonlyField label="Categoría" icon={Tags}>{viewProduct.category}</ReadonlyField>
+              <ReadonlyField label="Serial" icon={Barcode}>{viewProduct.serial || "—"}</ReadonlyField>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-4">
-              <ReadonlyField label="Modelo">{viewProduct.modelo || "—"}</ReadonlyField>
-              {canEditCost && (
-                <ReadonlyField label="Costo ($)">
-                  {formatCurrency(viewProduct.cost)}
-                </ReadonlyField>
-              )}
-              <ReadonlyField label="Precio ($)">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <ReadonlyField label="Modelo" icon={Boxes}>{viewProduct.modelo || "—"}</ReadonlyField>
+              <ReadonlyField label="Costo ($)" icon={DollarSign}>
+                {canEditCost ? formatCurrency(viewProduct.cost) : "Restringido"}
+              </ReadonlyField>
+              <ReadonlyField label="Precio ($)" icon={Tag}>
                 <span className="font-semibold">
                   {formatCurrency(viewProduct.price)}
                 </span>
               </ReadonlyField>
-              <ReadonlyField label="Existencia">{viewProduct.stock}</ReadonlyField>
+              <ReadonlyField label="Existencia" icon={Layers}>{viewProduct.stock}</ReadonlyField>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-4">
-              <ReadonlyField label="Estado">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <ReadonlyField label="Estado" icon={CircleCheck}>
                 <Badge
                   variant={viewProduct.status === "Activo" ? "success" : "danger"}
                   dot
@@ -371,22 +367,7 @@ export function ProductCardGrid({
                   {viewProduct.status}
                 </Badge>
               </ReadonlyField>
-              <ReadonlyField label="Creado">
-                {viewProduct.created_at
-                  ? formatDate(viewProduct.created_at, {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  : "—"}
-              </ReadonlyField>
-              <ReadonlyField label="Actualizado">
-                {viewProduct.updated_at
-                  ? formatDate(viewProduct.updated_at, {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  : "—"}
-              </ReadonlyField>
+              <ReadonlyField label="Requiere técnico">{viewProduct.requires_technician ? "Sí · cantidad en horas" : "No"}</ReadonlyField>
             </div>
           </div>
         </Modal>

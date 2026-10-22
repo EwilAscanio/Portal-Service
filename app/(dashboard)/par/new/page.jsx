@@ -14,7 +14,8 @@ import { createPar } from "@/lib/api";
 function buildEmptyForm() {
   return {
     clientId: "",
-    atencion: "",
+    plantId: "",
+    contactId: "",
     fechaEmision: new Date().toISOString().split("T")[0],
     exchangeRate: "0",
     observations: "",

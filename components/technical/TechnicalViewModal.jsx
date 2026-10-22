@@ -54,6 +54,9 @@ export function TechnicalViewModal({ tech, onClose, onEdit }) {
               {tech.email || "—"}
             </span>
           </ReadonlyField>
+          <ReadonlyField label="Usuario asociado" className="lg:col-span-2">
+            {tech.user_name ? `${tech.user_name} (${tech.user_login})` : "Sin asociación"}
+          </ReadonlyField>
           <ReadonlyField label="Registro" className="lg:col-span-2">
             {tech.created_at
               ? formatDate(tech.created_at, {

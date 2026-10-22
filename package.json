@@ -6,12 +6,23 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "npm run test:permissions && node spec/phase1.test.mjs && node spec/par-policy.test.mjs && node spec/par-edit.integration.test.mjs && node spec/service-order-policy.test.mjs && node spec/technician-calendar.test.mjs && node spec/validation.test.mjs && node spec/migrations.test.mjs && node spec/catalog-order.integration.test.mjs && node spec/data-import.test.mjs",
+    "test:permissions": "node spec/permissions.test.mjs",
+    "test:coverage": "node --experimental-test-coverage --test spec/*.test.mjs",
+    "verify": "npm test && npm run lint && npm run build",
+    "db:migrate": "node scripts/apply-migration.mjs",
+    "db:test-schema": "node scripts/test-schema.mjs",
+    "db:validate": "node scripts/validate-database.mjs",
+    "user:grant-super-admin": "node scripts/assign-super-administrator.mjs"
   },
   "dependencies": {
+    "@fullcalendar/react": "^7.1.0",
     "@hookform/resolvers": "^5.9.1",
+    "@react-pdf/renderer": "^4.9.0",
     "axios": "^1.20.0",
     "bcryptjs": "^3.0.3",
+    "exceljs": "^4.4.0",
     "framer-motion": "^13.2.0",
     "lucide-react": "^1.43.0",
     "next": "16.3.4",
@@ -22,13 +33,21 @@
     "react-hook-form": "^7.87.0",
     "react-hot-toast": "^2.6.0",
     "recharts": "^3.10.1",
+    "temporal-polyfill": "^1.0.5",
     "zod": "^4.5.4",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "eslint": "^10.10.0",
+    "eslint": "^9.39.5",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4"
+  },
+  "overrides": {
+    "exceljs": {
+      "archiver": "7.0.1",
+      "unzipper": "0.12.5",
+      "uuid": "11.1.1"
+    }
   }
 }

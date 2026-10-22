@@ -195,7 +195,15 @@ export default function LoginPage() {
               alt="Logo Maquitech"
               width={2167}
               height={726}
-              className="h-auto w-72 object-contain"
+              className="h-auto w-72 object-contain dark:hidden"
+            />
+            <Image
+              src="/Logo_Blanco.png"
+              alt="Logo Maquitech"
+              width={2167}
+              height={726}
+              className="hidden h-auto w-72 object-contain dark:block"
+              unoptimized
             />
           </div>
           <div className="mb-12 hidden justify-center lg:flex">
@@ -204,8 +212,17 @@ export default function LoginPage() {
               alt="Logo Maquitech"
               width={2167}
               height={726}
-              className="h-auto w-72 object-contain"
+              className="h-auto w-72 object-contain dark:hidden"
               priority
+            />
+            <Image
+              src="/Logo_Blanco.png"
+              alt="Logo Maquitech"
+              width={2167}
+              height={726}
+              className="hidden h-auto w-72 object-contain dark:block"
+              priority
+              unoptimized
             />
           </div>
 

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Cog, Download, Pencil, Plus, Trash2 } from "lucide-react";
+import { motion } from "framer-motion";
+import { AlertCircle, Barcode, Boxes, Cog, Download, Gauge, Handshake, Pencil, Plus, Tag, Trash2, Zap } from "lucide-react";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -12,6 +13,7 @@ import {
   updateEquipment,
   deleteEquipment,
   getClients,
+  getPlants,
 } from "@/lib/api";
 import { DataTable } from "@/components/tables/DataTable";
 import { RowActions } from "@/components/tables/RowActions";
@@ -28,23 +30,23 @@ import { ViewToggle } from "@/components/ui/ViewToggle";
 import { ClientSearch } from "@/components/ui/ClientSearch";
 import { FadeInUp } from "@/components/ui/animated";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { formatDate } from "@/lib/format";
 import { downloadCsv } from "@/utils/csv";
 import { cn } from "@/utils/cn";
 import { EQUIPMENT_STATUS_VARIANTS } from "@/lib/status";
+import { getPublicError } from "@/lib/ui-errors";
+import { equipmentFormSchema } from "@/lib/validators";
 
 const EQUIPMENT_STATUSES = Object.keys(EQUIPMENT_STATUS_VARIANTS);
 
-function toDateInputValue(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toISOString().slice(0, 10);
-}
-
-function fromDateInputValue(value) {
-  if (!value) return null;
-  return new Date(`${value}T00:00:00`).toISOString();
+function validateEquipment(values) {
+  const parsed = equipmentFormSchema.safeParse(values);
+  if (parsed.success) return {};
+  const issues = {};
+  for (const issue of parsed.error.issues) {
+    const key = issue.path[0];
+    if (key && !issues[key]) issues[key] = issue.message;
+  }
+  return issues;
 }
 
 const EMPTY_FORM = {
@@ -53,10 +55,11 @@ const EMPTY_FORM = {
   model: "",
   serial: "",
   clientId: "",
-  location: "",
+  plantId: "",
+  consortium: "",
+  hp: "",
+  pressure: "",
   status: "Operativo",
-  lastMaintenance: "",
-  nextMaintenance: "",
 };
 
 export default function EquiposPage() {
@@ -64,13 +67,14 @@ export default function EquiposPage() {
 
   const [equipment, setEquipment] = useState([]);
   const [clients, setClients] = useState([]);
+  const [plants, setPlants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [clientFilter, setClientFilter] = useState("Todos");
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [errors, setErrors] = useState({});
+  const [fieldErrors, setFieldErrors] = useState({});
   const [serverError, setServerError] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirm, setConfirm] = useState({ open: false, equipment: null });
@@ -85,14 +89,16 @@ export default function EquiposPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [equipmentData, clientsData] = await Promise.all([
+      const [equipmentData, clientsData, plantsData] = await Promise.all([
         getEquipment(),
         getClients(),
+        getPlants(),
       ]);
       setEquipment(equipmentData);
       setClients(clientsData);
+      setPlants(plantsData);
     } catch (err) {
-      notify.error("Error al cargar equipos.", { description: err.message });
+      notify.error("Error al cargar equipos.", { description: getPublicError(err, "No se pudieron cargar los equipos.") });
     } finally {
       setLoading(false);
     }
@@ -112,7 +118,7 @@ export default function EquiposPage() {
     const q = debouncedQuery.trim().toLowerCase();
     if (q) {
       rows = rows.filter((row) =>
-        ["name", "brand", "model", "serial", "client_name", "location"].some(
+        ["name", "brand", "model", "serial", "client_name", "plant_name", "location", "consortium", "hp", "pressure"].some(
           (key) => String(row[key] ?? "").toLowerCase().includes(q)
         )
       );
@@ -120,16 +126,21 @@ export default function EquiposPage() {
     return rows;
   }, [equipment, statusFilter, clientFilter, debouncedQuery]);
 
+  const availablePlants = useMemo(
+    () => plants.filter((plant) => plant.client_id === form.clientId),
+    [plants, form.clientId]
+  );
+
   const setField = (field) => (event) => {
     setForm((c) => ({ ...c, [field]: event.target.value }));
-    setErrors((c) => ({ ...c, [field]: undefined }));
+    setFieldErrors((c) => ({ ...c, [field]: undefined }));
     setServerError("");
   };
 
   const openCreate = () => {
     setEditing(null);
     setForm(EMPTY_FORM);
-    setErrors({});
+    setFieldErrors({});
     setServerError("");
     setModalOpen(true);
   };
@@ -142,30 +153,22 @@ export default function EquiposPage() {
       model: row.model ?? "",
       serial: row.serial ?? "",
       clientId: row.client_id ?? "",
-      location: row.location ?? "",
+      plantId: row.plant_id ?? "",
+      consortium: row.consortium ?? "",
+      hp: row.hp ?? "",
+      pressure: row.pressure ?? "",
       status: row.status ?? "Operativo",
-      lastMaintenance: toDateInputValue(row.last_maintenance),
-      nextMaintenance: toDateInputValue(row.next_maintenance),
     });
-    setErrors({});
+    setFieldErrors({});
     setServerError("");
     setModalOpen(true);
   };
 
-  const validate = () => {
-    const errs = {};
-    if (!form.name.trim()) errs.name = "El nombre del equipo es obligatorio.";
-    if (!form.brand.trim()) errs.brand = "La marca es obligatoria.";
-    if (!form.model.trim()) errs.model = "El modelo es obligatorio.";
-    if (!form.serial.trim()) errs.serial = "El serial es obligatorio.";
-    if (!form.clientId) errs.clientId = "Selecciona un cliente.";
-    return errs;
-  };
-
   const handleSubmit = async (event) => {
     event.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+    const errs = validateEquipment(form);
+    if (Object.keys(errs).length) { setFieldErrors(errs); setServerError(""); return; }
+    setFieldErrors({});
 
     setSaving(true);
     setServerError("");
@@ -176,10 +179,11 @@ export default function EquiposPage() {
         model: form.model.trim(),
         serial: form.serial.trim(),
         clientId: form.clientId,
-        location: form.location.trim() || null,
+        plantId: form.plantId,
+        consortium: form.consortium.trim() || null,
+        hp: form.hp === "" ? null : Number(form.hp),
+        pressure: form.pressure === "" ? null : Number(form.pressure),
         status: form.status,
-        lastMaintenance: fromDateInputValue(form.lastMaintenance),
-        nextMaintenance: fromDateInputValue(form.nextMaintenance),
       };
       if (editing) {
         await updateEquipment(editing.id, payload);
@@ -190,7 +194,7 @@ export default function EquiposPage() {
       setModalOpen(false);
       loadData();
     } catch (err) {
-      setServerError(err.response?.data?.error || err.message);
+      setServerError(getPublicError(err, "No se pudo guardar el equipo."));
     } finally {
       setSaving(false);
     }
@@ -208,7 +212,7 @@ export default function EquiposPage() {
       setConfirm({ open: false, equipment: null });
       loadData();
     } catch (err) {
-      notify.error(err.response?.data?.error || err.message);
+      notify.error(getPublicError(err, "No se pudo completar la operación con el equipo."));
     }
   };
 
@@ -222,11 +226,12 @@ export default function EquiposPage() {
         Modelo: row.model,
         Serial: row.serial,
         Cliente: row.client_name || "",
+        Planta: row.plant_name || "",
+        Consorcio: row.consortium || "",
+        HP: row.hp ?? "",
+        "Presion (PSI)": row.pressure ?? "",
         Ubicacion: row.location || "",
         Estado: row.status,
-        "Proximo mantenimiento": row.next_maintenance
-          ? formatDate(row.next_maintenance)
-          : "",
       }))
     );
     notify.success("Exportacion completa", {
@@ -285,6 +290,12 @@ export default function EquiposPage() {
       ),
     },
     {
+      key: "plant_name",
+      header: "Planta",
+      className: "hidden xl:table-cell",
+      render: (row) => <span className="text-sm">{row.plant_name || "—"}</span>,
+    },
+    {
       key: "location",
       header: "Ubicación",
       className: "hidden xl:table-cell",
@@ -299,13 +310,10 @@ export default function EquiposPage() {
       ),
     },
     {
-      key: "next_maintenance",
-      header: "Próx. mantenimiento",
-      className: "hidden md:table-cell",
-      sortable: true,
-      accessor: (row) => row.next_maintenance ?? "",
-      render: (row) =>
-        row.next_maintenance ? formatDate(row.next_maintenance) : "—",
+      key: "specifications",
+      header: "Especificaciones",
+      className: "hidden xl:table-cell",
+      render: (row) => <span className="text-sm">{[row.consortium, row.hp != null ? `${row.hp} HP` : null, row.pressure != null ? `${row.pressure} PSI` : null].filter(Boolean).join(" · ") || "—"}</span>,
     },
     {
       key: "actions",
@@ -343,7 +351,7 @@ export default function EquiposPage() {
                 placeholder="Buscar por equipo, marca, serial, cliente…"
                 className="w-56 shrink-0"
               />
-              <div className="flex shrink-0 items-center gap-1 rounded-xl border border-border bg-surface p-1">
+              <div className="flex min-w-0 items-center gap-1 overflow-x-auto rounded-xl border border-border bg-surface p-1">
                 {["Todos", ...EQUIPMENT_STATUSES].map((status) => {
                   const active = statusFilter === status;
                   return (
@@ -353,7 +361,7 @@ export default function EquiposPage() {
                       onClick={() => setStatusFilter(status)}
                       aria-pressed={active}
                       className={cn(
-                        "inline-flex h-8 items-center rounded-lg px-3 text-xs font-medium transition-colors",
+                        "inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-lg px-3 text-xs font-medium transition-colors",
                         active
                           ? "bg-blue-600 text-white"
                           : "text-muted hover:bg-surface-2 hover:text-foreground"
@@ -410,7 +418,7 @@ export default function EquiposPage() {
             ? "Modifica los datos del equipo."
             : "Registra maquinaria en el inventario."
         }
-        size="xl"
+        size="2xl"
         footer={
           <>
             <Button
@@ -433,70 +441,84 @@ export default function EquiposPage() {
           noValidate
         >
           {serverError && (
-            <div
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
               role="alert"
               className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-600 dark:text-red-400"
             >
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               {serverError}
-            </div>
+            </motion.div>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Input
-              label="Nombre del equipo"
-              placeholder="Compresor de Aire GA55"
+              label="Tipo de Equipo *"
+              icon={Cog}
+              placeholder="Compresor de aire"
+              autoFocus
               value={form.name}
-              error={errors.name}
+              error={fieldErrors.name}
               onChange={setField("name")}
+              containerClassName="sm:col-span-2 lg:col-span-2"
             />
             <Input
-              label="Marca"
+              label="Marca *"
+              icon={Tag}
               placeholder="Atlas Copco"
               value={form.brand}
-              error={errors.brand}
+              error={fieldErrors.brand}
               onChange={setField("brand")}
+            />
+            <Input
+              label="Modelo *"
+              icon={Boxes}
+              placeholder="GA55"
+              value={form.model}
+              error={fieldErrors.model}
+              onChange={setField("model")}
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="lg:col-span-2">
+              <ClientSearch
+                clients={editing ? clients : clients.filter((client) => client.status === "1")}
+                value={form.clientId}
+                onChange={(clientId) => {
+                  setForm((c) => ({ ...c, clientId, plantId: "" }));
+                  setFieldErrors((c) => ({ ...c, clientId: undefined, plantId: undefined }));
+                  setServerError("");
+                }}
+                error={fieldErrors.clientId}
+              />
+            </div>
+            <div>
+              <Select
+                label="Planta *"
+                value={form.plantId}
+                disabled={!form.clientId}
+                error={fieldErrors.plantId}
+                onChange={setField("plantId")}
+                options={[
+                  { value: "", label: form.clientId ? "Seleccione una planta" : "Seleccione primero un cliente" },
+                  ...availablePlants.map((plant) => ({ value: plant.id, label: plant.name })),
+                ]}
+              />
+            </div>
             <Input
-              label="Modelo"
-              placeholder="GA55"
-              value={form.model}
-              error={errors.model}
-              onChange={setField("model")}
-            />
-            <Input
-              label="Serial"
+              label="Serial *"
+              icon={Barcode}
               placeholder="APX-2024-001"
               value={form.serial}
-              error={errors.serial}
+              error={fieldErrors.serial}
               onChange={setField("serial")}
               disabled={Boolean(editing)}
             />
           </div>
 
-          <div className="grid gap-4">
-            <ClientSearch
-              clients={clients}
-              value={form.clientId}
-              onChange={(clientId) => {
-                setForm((c) => ({ ...c, clientId }));
-                setErrors((c) => ({ ...c, clientId: undefined }));
-                setServerError("");
-              }}
-              error={errors.clientId}
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label="Ubicación"
-              placeholder="Planta principal"
-              value={form.location}
-              onChange={setField("location")}
-            />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Select
               label="Estado"
               value={form.status}
@@ -506,21 +528,9 @@ export default function EquiposPage() {
                 label: status,
               }))}
             />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label="Último mantenimiento"
-              type="date"
-              value={form.lastMaintenance}
-              onChange={setField("lastMaintenance")}
-            />
-            <Input
-              label="Próximo mantenimiento"
-              type="date"
-              value={form.nextMaintenance}
-              onChange={setField("nextMaintenance")}
-            />
+            <Input label="Consorcio" icon={Handshake} value={form.consortium} onChange={setField("consortium")} />
+            <Input label="HP" icon={Zap} type="number" min="0" step="0.01" value={form.hp} error={fieldErrors.hp} onChange={setField("hp")} />
+            <Input label="Presión (PSI)" icon={Gauge} type="number" min="0" step="0.01" value={form.pressure} error={fieldErrors.pressure} onChange={setField("pressure")} />
           </div>
         </form>
       </Modal>

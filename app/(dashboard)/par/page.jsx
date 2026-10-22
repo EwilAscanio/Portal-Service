@@ -398,8 +398,11 @@ export default function ParPage() {
               <ReadonlyField label="Equipo principal">
                 {viewPar.main_equipment || "—"}
               </ReadonlyField>
-              <ReadonlyField label="Atención">
-                {viewPar.atencion || "—"}
+              <ReadonlyField label="Contacto">
+                {viewPar.contact_name || "—"}
+              </ReadonlyField>
+              <ReadonlyField label="Planta">
+                {viewPar.plant_name || "—"}
               </ReadonlyField>
               <ReadonlyField label="Elaborado por">
                 {viewPar.created_by_name || "—"}

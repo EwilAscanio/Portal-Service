@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { AlertCircle, IdCard, Mail, Phone, User } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { getAssignableTechnicianUsers } from "@/lib/api";
 
-const EMPTY = { cedula: "", name: "", phone: "", email: "", status: "Activo" };
+const EMPTY = { cedula: "", name: "", phone: "", email: "", status: "Activo", userId: "" };
 
 function initialValues(technician) {
   if (!technician) return EMPTY;
@@ -17,6 +19,7 @@ function initialValues(technician) {
     phone: technician.phone ?? "",
     email: technician.email ?? "",
     status: technician.status ?? "Activo",
+    userId: technician.user_id ?? "",
   };
 }
 
@@ -32,6 +35,16 @@ export function TechnicalFormModal({ open, onClose, onSubmit, technician, loadin
   const [values, setValues] = useState(() => initialValues(technician));
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
+  const [users, setUsers] = useState([]);
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    getAssignableTechnicianUsers(technician?.id)
+      .then((rows) => { if (active) setUsers(rows); })
+      .catch(() => { if (active) setUsers([]); });
+    return () => { active = false; };
+  }, [open, technician?.id]);
 
   const set = (field) => (event) => {
     setValues((c) => ({ ...c, [field]: event.target.value }));
@@ -51,6 +64,7 @@ export function TechnicalFormModal({ open, onClose, onSubmit, technician, loadin
         phone: values.phone.trim() || null,
         email: values.email.trim() || null,
         status: isEdit ? values.status : undefined,
+        userId: values.userId || null,
       });
     } catch (err) {
       setServerError(err.message || "Error al guardar el técnico.");
@@ -128,6 +142,22 @@ export function TechnicalFormModal({ open, onClose, onSubmit, technician, loadin
             onChange={set("email")}
           />
         </div>
+
+        <Select
+          label="Usuario asociado"
+          value={values.userId}
+          onChange={set("userId")}
+        >
+          <option value="">Sin usuario asociado</option>
+          {users.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name} ({item.login})
+            </option>
+          ))}
+        </Select>
+        <p className="-mt-2 text-xs text-muted">
+          Esta relación permite que el usuario Técnico consulte únicamente su propia agenda.
+        </p>
 
         {isEdit && (
           <div>

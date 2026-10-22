@@ -3,8 +3,10 @@
 import { Check, Minus } from "lucide-react";
 import { ROUTE_LABELS } from "@/lib/constants";
 import { cn } from "@/utils/cn";
+import { canAccessRole } from "@/lib/permissions";
 
 const SHORT_ROLE_LABELS = {
+  Superadministrador: "Superadmin",
   Administrador: "Admin",
   Supervisor: "Supervisor",
   Coordinador: "Coord.",
@@ -50,7 +52,7 @@ export function PermissionsMatrix({ permissions, availableRoles }) {
                 {row.label}
               </td>
               {availableRoles.map((role) => {
-                const hasAccess = row.roles.includes(role);
+                const hasAccess = canAccessRole(role, row.roles);
                 return (
                   <td key={role} className="py-2.5 px-3 text-center">
                     {hasAccess ? (

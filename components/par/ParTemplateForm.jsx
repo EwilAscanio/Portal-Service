@@ -8,6 +8,7 @@ import { z } from "zod";
 import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { notify } from "@/lib/toast";
+import { DEFAULT_PRODUCT_CATEGORY, PRODUCT_CATEGORIES } from "@/lib/par/constants";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -23,7 +24,7 @@ const itemRowSchema = z.object({
   productId: z.string().optional().or(z.literal("")),
   descripcion: z.string().optional().or(z.literal("")),
   qty: z.string().optional().or(z.literal("")),
-  categoria: z.string().optional().or(z.literal("")),
+  categoria: z.enum(["Servicio", "Repuestos"]),
   ccn: z.string().optional().or(z.literal("")),
   usList: z.string().optional().or(z.literal("")),
   multiplicador: z.string().optional().or(z.literal("")),
@@ -44,7 +45,7 @@ function emptyItem(itemNo) {
     productId: "",
     descripcion: "",
     qty: "",
-    categoria: "Mano de Obra",
+    categoria: DEFAULT_PRODUCT_CATEGORY,
     ccn: "",
     usList: "",
     multiplicador: "1",
@@ -59,7 +60,7 @@ function toRow(item, index) {
     productId: item.product_id ?? "",
     descripcion: item.descripcion ?? "",
     qty: item.qty == null ? "" : String(item.qty),
-    categoria: item.categoria ?? "",
+    categoria: item.categoria ?? DEFAULT_PRODUCT_CATEGORY,
     ccn: item.ccn ?? "",
     usList: item.us_list ?? "",
     multiplicador: item.multiplicador == null ? "1" : String(item.multiplicador),
@@ -91,7 +92,8 @@ export function ParTemplateForm({ templateId = null }) {
     name: "items",
   });
 
-  const items = useWatch({ control: form.control, name: "items" }) ?? [];
+  const watchedItems = useWatch({ control: form.control, name: "items" });
+  const items = useMemo(() => watchedItems ?? [], [watchedItems]);
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(Boolean(templateId));
@@ -139,9 +141,16 @@ export function ParTemplateForm({ templateId = null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- carga inicial al montar
   }, [templateId]);
 
+  const selectedProductIds = useMemo(
+    () => new Set(items.map((item) => item.productId).filter(Boolean)),
+    [items]
+  );
   const itemProducts = useMemo(
-    () => products.filter((product) => product.type !== "Equipo"),
-    [products]
+    () => products.filter(
+      (product) => PRODUCT_CATEGORIES.includes(product.category)
+        && (product.status === "Activo" || selectedProductIds.has(product.id))
+    ),
+    [products, selectedProductIds]
   );
 
   function handleProductPick(index, product) {
@@ -153,10 +162,7 @@ export function ParTemplateForm({ templateId = null }) {
     if (product.price) {
       form.setValue(`items.${index}.valorUnitUsd`, String(product.price));
     }
-    form.setValue(
-      `items.${index}.categoria`,
-      product.category === "Servicio" ? "Mano de Obra" : "Repuestos y Consumibles"
-    );
+    form.setValue(`items.${index}.categoria`, product.category);
   }
 
   function addItem() {
@@ -332,7 +338,7 @@ export function ParTemplateForm({ templateId = null }) {
                                     product.description.toLowerCase().includes(value)) ||
                                   (product.code && product.code.toLowerCase().includes(value)) ||
                                   (product.brand && product.brand.toLowerCase().includes(value)) ||
-                                  (product.type && product.type.toLowerCase().includes(value)) ||
+                                  (product.category && product.category.toLowerCase().includes(value)) ||
                                   (product.category && product.category.toLowerCase().includes(value))
                                 );
                               }}

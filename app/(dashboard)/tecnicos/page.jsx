@@ -26,6 +26,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { TechnicalFormModal } from "@/components/technical/TechnicalFormModal";
 import { TechnicalViewModal } from "@/components/technical/TechnicalViewModal";
 import { cn } from "@/utils/cn";
+import { ACTIVE_STATUS, INACTIVE_STATUS } from "@/lib/par/constants";
 
 function formatDateTime(iso) {
   if (!iso) return "—";
@@ -109,7 +110,7 @@ export default function TecnicosPage() {
 
   const confirmToggle = async () => {
     const { technician } = confirm;
-    const newStatus = technician.status === "Activo" ? "Inactivo" : "Activo";
+    const newStatus = technician.status === ACTIVE_STATUS ? INACTIVE_STATUS : ACTIVE_STATUS;
     try {
       await updateTechnicianStatus(technician.id, newStatus);
       notify.success(`Técnico ${newStatus === "Activo" ? "activado" : "desactivado"}.`);
@@ -154,7 +155,7 @@ export default function TecnicosPage() {
       header: "Estado",
       sortable: true,
       render: (row) => (
-        <Badge variant={row.status === "Activo" ? "success" : "danger"} dot>
+        <Badge variant={row.status === ACTIVE_STATUS ? "success" : "danger"} dot>
           {row.status}
         </Badge>
       ),

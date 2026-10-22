@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Monitor, Moon, Sun, RefreshCw, Globe, MapPin, Building2, Image as ImageIcon, DollarSign } from "lucide-react";
+import Link from "next/link";
+import { Monitor, Moon, Sun, RefreshCw, Globe, MapPin, Building2, Image as ImageIcon, DollarSign, ArrowRight, FileUp } from "lucide-react";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { notify } from "@/lib/toast";
+import { getPublicError } from "@/lib/ui-errors";
 import { syncUbicacion, getConfiguration, updateConfiguration } from "@/lib/api";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import {
@@ -40,6 +43,7 @@ export default function ConfiguracionPage() {
   usePageTitle("Configuración");
 
   const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
 
   const [company, setCompany] = useState({
     name: "",
@@ -83,7 +87,7 @@ export default function ConfiguracionPage() {
       })
       .catch((error) => {
         notify.error("Error al cargar la configuración", {
-          description: error.message,
+          description: getPublicError(error, "No se pudo cargar la configuración."),
         });
       })
       .finally(() => setCompanyLoading(false));
@@ -128,7 +132,7 @@ export default function ConfiguracionPage() {
       });
     } catch (error) {
       notify.error("Error al guardar", {
-        description: error.response?.data?.error || error.message,
+        description: getPublicError(error, "No se pudo guardar la configuración."),
       });
     } finally {
       setRateSaving(false);
@@ -165,7 +169,7 @@ export default function ConfiguracionPage() {
       });
     } catch (error) {
       notify.error("Error al guardar", {
-        description: error.response?.data?.error || error.message,
+        description: getPublicError(error, "No se pudo guardar la tasa."),
       });
     } finally {
       setCompanySaving(false);
@@ -211,7 +215,7 @@ export default function ConfiguracionPage() {
       const data = await syncUbicacion(endpoint);
       notify.success(`${label} sincronizados`, { description: data.message });
     } catch (error) {
-      notify.error("Error de sincronización", { description: error.message });
+      notify.error("Error de sincronización", { description: getPublicError(error, "No se pudo sincronizar la ubicación.") });
     } finally {
       setSyncing(null);
     }
@@ -536,6 +540,35 @@ export default function ConfiguracionPage() {
           </Card>
         </FadeInUp>
       </Stagger>
+
+      {user?.role === ROLES.SUPER_ADMIN && (
+        <FadeInUp>
+          <Card>
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <FileUp className="h-5 w-5" />
+                </span>
+                <div>
+                  <CardTitle>Importación de datos</CardTitle>
+                  <CardDescription>
+                    Carga Productos, Plantas, Contactos y Equipos desde Excel con validación previa.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Link
+                href="/importaciones"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+              >
+                Abrir importación de datos
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </CardContent>
+          </Card>
+        </FadeInUp>
+      )}
 
       {/* Sincronización Saint */}
       <FadeInUp>

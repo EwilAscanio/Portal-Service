@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, PackageCheck, Pencil, Plus, ToggleLeft, ToggleRight } from "lucide-react";
+import { motion } from "framer-motion";
+import { AlertCircle, Barcode, Boxes, DollarSign, Factory, FileText, Hash, Layers, PackageCheck, Pencil, Plus, Tag, ToggleLeft, ToggleRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -27,32 +28,36 @@ import { FadeInUp } from "@/components/ui/animated";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/utils/cn";
+import { ROLES } from "@/lib/permissions";
+import { PRODUCT_CATEGORY_FILTERS } from "@/lib/par/constants";
+import { getPublicError } from "@/lib/ui-errors";
+import { productSchema } from "@/lib/validators";
 
-const CATEGORIES = ["Todos", "Servicio", "Repuestos"];
+const CATEGORIES = PRODUCT_CATEGORY_FILTERS;
 
 const EMPTY_FORM = {
   code: "",
   description: "",
-  type: "",
   brand: "",
   serial: "",
   modelo: "",
   cost: "",
   price: "",
   category: "Servicio",
+  requiresTechnician: false,
   stock: "",
   status: "Activo",
 };
 
-function formatDateTime(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("es-CO", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function validateProduct(values) {
+  const parsed = productSchema.safeParse(values);
+  if (parsed.success) return {};
+  const issues = {};
+  for (const issue of parsed.error.issues) {
+    const key = issue.path[0];
+    if (key && !issues[key]) issues[key] = issue.message;
+  }
+  return issues;
 }
 
 export default function ProductosPage() {
@@ -66,7 +71,7 @@ export default function ProductosPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [errors, setErrors] = useState({});
+  const [fieldErrors, setFieldErrors] = useState({});
   const [serverError, setServerError] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirm, setConfirm] = useState({ open: false, product: null });
@@ -79,14 +84,14 @@ export default function ProductosPage() {
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounce(query, 200);
 
-  const canEditCost = user?.role === "Administrador" || user?.role === "Supervisor";
+  const canEditCost = [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.SUPERVISOR].includes(user?.role);
 
   const loadData = useCallback(async () => {
     try {
       const params = categoryFilter !== "Todos" ? { category: categoryFilter } : undefined;
       setProducts(await getProducts(params));
     } catch (err) {
-      notify.error("Error al cargar productos.", { description: err.message });
+      notify.error("Error al cargar productos.", { description: getPublicError(err, "No se pudieron cargar los productos.") });
     } finally {
       setLoading(false);
     }
@@ -106,15 +111,15 @@ export default function ProductosPage() {
   }, [products, debouncedQuery]);
 
   const setField = (field) => (event) => {
-    setForm((c) => ({ ...c, [field]: event.target.value }));
-    setErrors((c) => ({ ...c, [field]: undefined }));
+    setForm((c) => ({ ...c, [field]: event.target.value, ...(field === "category" && event.target.value !== "Servicio" ? { requiresTechnician: false } : {}) }));
+    setFieldErrors((c) => ({ ...c, [field]: undefined }));
     setServerError("");
   };
 
   const openCreate = () => {
     setEditing(null);
     setForm(EMPTY_FORM);
-    setErrors({});
+    setFieldErrors({});
     setServerError("");
     setModalOpen(true);
   };
@@ -124,40 +129,30 @@ export default function ProductosPage() {
     setForm({
       code: product.code ?? "",
       description: product.description ?? "",
-      type: product.type ?? "",
       brand: product.brand ?? "",
       serial: product.serial ?? "",
       modelo: product.modelo ?? "",
       cost: product.cost ?? "",
       price: product.price ?? "",
       category: product.category ?? "Servicio",
+      requiresTechnician: product.requires_technician ?? false,
       stock: product.stock ?? "",
       status: product.status ?? "Activo",
     });
-    setErrors({});
+    setFieldErrors({});
     setServerError("");
     setModalOpen(true);
   };
 
-  const validate = () => {
-    const errs = {};
-    if (!form.code.trim()) errs.code = "El código es obligatorio.";
-    if (!form.description.trim()) errs.description = "La descripción es obligatoria.";
-    if (!form.type.trim()) errs.type = "El tipo es obligatorio.";
-    if (form.cost === "" || form.cost == null) errs.cost = "El costo es obligatorio.";
-    else if (Number(form.cost) < 0) errs.cost = "El costo no puede ser negativo.";
-    if (form.price === "" || form.price == null) errs.price = "El precio es obligatorio.";
-    else if (Number(form.price) < 0) errs.price = "El precio no puede ser negativo.";
-    if (form.stock !== "" && form.stock != null && Number(form.stock) < 0) {
-      errs.stock = "La existencia no puede ser negativa.";
-    }
-    return errs;
-  };
-
   const handleSubmit = async (event) => {
     event.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+    const errs = validateProduct({
+      ...form,
+      cost: form.cost === "" ? undefined : form.cost,
+      price: form.price === "" ? undefined : form.price,
+    });
+    if (Object.keys(errs).length) { setFieldErrors(errs); setServerError(""); return; }
+    setFieldErrors({});
 
     setSaving(true);
     setServerError("");
@@ -166,13 +161,13 @@ export default function ProductosPage() {
         await updateProduct(editing.id, {
           code: form.code.trim(),
           description: form.description.trim(),
-          type: form.type.trim(),
           brand: form.brand.trim() || null,
           serial: form.serial.trim() || null,
           modelo: form.modelo.trim() || null,
           cost: Number(form.cost),
           price: Number(form.price),
           category: form.category,
+          requiresTechnician: form.category === "Servicio" && form.requiresTechnician,
           stock: form.stock !== "" ? Number(form.stock) : 0,
           status: form.status,
         });
@@ -180,13 +175,13 @@ export default function ProductosPage() {
         await createProduct({
           code: form.code.trim(),
           description: form.description.trim(),
-          type: form.type.trim(),
           brand: form.brand.trim() || null,
           serial: form.serial.trim() || null,
           modelo: form.modelo.trim() || null,
           cost: Number(form.cost),
           price: Number(form.price),
           category: form.category,
+          requiresTechnician: form.category === "Servicio" && form.requiresTechnician,
           stock: form.stock !== "" ? Number(form.stock) : 0,
         });
       }
@@ -194,7 +189,7 @@ export default function ProductosPage() {
       setModalOpen(false);
       loadData();
     } catch (err) {
-      setServerError(err.response?.data?.error || err.message);
+      setServerError(getPublicError(err, "No se pudo guardar el producto."));
     } finally {
       setSaving(false);
     }
@@ -213,7 +208,7 @@ export default function ProductosPage() {
       setConfirm({ open: false, product: null });
       loadData();
     } catch (err) {
-      notify.error(err.message);
+      notify.error(getPublicError(err, "No se pudo cambiar el estado del producto."));
     }
   };
 
@@ -232,13 +227,7 @@ export default function ProductosPage() {
       key: "description",
       header: "Descripción",
       sortable: true,
-      render: (row) => <p className="font-medium text-foreground">{row.description}</p>,
-    },
-    {
-      key: "type",
-      header: "Tipo",
-      sortable: true,
-      render: (row) => <span className="text-sm">{row.type}</span>,
+      render: (row) => <div><p className="font-medium text-foreground">{row.description}</p>{row.requires_technician && <span className="text-xs text-blue-600">Mano de obra · requiere técnico</span>}</div>,
     },
     {
       key: "brand",
@@ -423,57 +412,53 @@ export default function ProductosPage() {
       >
         <form id="product-form" onSubmit={handleSubmit} className="space-y-4" noValidate>
           {serverError && (
-            <div
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
               role="alert"
               className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-600 dark:text-red-400"
             >
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               {serverError}
-            </div>
+            </motion.div>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Input
-              label="Código"
+              label="Código *"
+              icon={Hash}
               placeholder="EQP-001"
-              containerClassName="sm:col-span-1"
+              autoFocus
               value={form.code}
-              error={errors.code}
+              error={fieldErrors.code}
               onChange={setField("code")}
               disabled={Boolean(editing)}
             />
             <Input
-              label="Descripción"
+              label="Descripción *"
+              icon={FileText}
               placeholder="Nombre o descripción del producto"
-              containerClassName="sm:col-span-3"
+              containerClassName="sm:col-span-1 lg:col-span-3"
               value={form.description}
-              error={errors.description}
+              error={fieldErrors.description}
               onChange={setField("description")}
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-4">
-            <Select
-              label="Tipo"
-              value={form.type}
-              error={errors.type}
-              onChange={setField("type")}
-              options={[
-                { value: "Repuesto", label: "Repuesto" },
-                { value: "Servicio", label: "Servicio" },
-              ]}
-            />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Input
               label="Marca"
+              icon={Factory}
               placeholder="Ingelsonrand"
               value={form.brand}
               onChange={setField("brand")}
+              containerClassName="sm:col-span-2 lg:col-span-2"
             />
             <Select
               label="Categoría"
               value={form.category}
               onChange={setField("category")}
-              error={errors.category}
+              error={fieldErrors.category}
               options={[
                 { value: "Servicio", label: "Servicio" },
                 { value: "Repuestos", label: "Repuestos" },
@@ -481,65 +466,75 @@ export default function ProductosPage() {
             />
             <Input
               label="Serial"
+              icon={Barcode}
               placeholder="IR998231"
               value={form.serial}
               onChange={setField("serial")}
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-4">
+          <div className="rounded-xl border border-border p-3 text-sm">
+            <label className="flex items-center gap-2"><input type="checkbox" checked={form.requiresTechnician} disabled={form.category !== "Servicio"} onChange={(event) => setForm((current) => ({ ...current, requiresTechnician: event.target.checked }))} />Requiere técnico (mano de obra por horas)</label>
+            <p className="mt-1 text-xs text-muted">La cantidad del producto en el PAR será el presupuesto de horas. Los renglones ya guardados conservan su clasificación; para actualizar un PAR editable, vuelva a seleccionar el producto.</p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Input
               label="Modelo"
+              icon={Boxes}
               placeholder="NIRVANA 150"
               value={form.modelo}
               onChange={setField("modelo")}
             />
+            {canEditCost ? (
+              <Input
+                label="Costo ($) *"
+                icon={DollarSign}
+                type="number"
+                placeholder="0"
+                min="0"
+                value={form.cost}
+                error={fieldErrors.cost}
+                onChange={setField("cost")}
+              />
+            ) : (
+              <Input label="Costo ($)" value="Restringido" disabled />
+            )}
             <Input
-              label="Costo ($)"
-              type="number"
-              placeholder="0"
-              min="0"
-              value={form.cost}
-              error={errors.cost}
-              onChange={setField("cost")}
-              disabled={!canEditCost}
-              hint={!canEditCost ? "Solo Admin/Supervisor." : undefined}
-            />
-            <Input
-              label="Precio ($)"
+              label="Precio ($) *"
+              icon={Tag}
               type="number"
               placeholder="0"
               min="0"
               value={form.price}
-              error={errors.price}
+              error={fieldErrors.price}
               onChange={setField("price")}
               disabled={!canEditCost}
               hint={!canEditCost ? "Solo Admin/Supervisor." : undefined}
             />
             <Input
               label="Existencia"
+              icon={Layers}
               type="number"
               placeholder="0"
               min="0"
               value={form.stock}
-              error={errors.stock}
+              error={fieldErrors.stock}
               onChange={setField("stock")}
             />
           </div>
 
           {editing && (
-            <div className="grid gap-4 sm:grid-cols-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-foreground">Estado</label>
-                <select
-                  value={form.status}
-                  onChange={setField("status")}
-                  className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-foreground transition-colors hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 focus:outline-none dark:hover:border-slate-600"
-                >
-                  <option value="Activo">Activo</option>
-                  <option value="Inactivo">Inactivo</option>
-                </select>
-              </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Select
+                label="Estado"
+                value={form.status}
+                onChange={setField("status")}
+                options={[
+                  { value: "Activo", label: "Activo" },
+                  { value: "Inactivo", label: "Inactivo" },
+                ]}
+              />
             </div>
           )}
         </form>

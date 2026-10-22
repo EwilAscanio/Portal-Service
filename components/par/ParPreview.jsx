@@ -49,8 +49,9 @@ export function ParPreview({ par }) {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted">Atención</p>
-              <p className="text-sm text-foreground">{par.atencion || "—"}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">Contacto</p>
+              <p className="text-sm text-foreground">{par.contact_name || "—"}</p>
+              <p className="text-xs text-muted">{par.contact_phone || par.contact_email || ""}</p>
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">
@@ -61,6 +62,12 @@ export function ParPreview({ par }) {
               </p>
             </div>
           </div>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Planta</p>
+          <p className="font-medium text-foreground">{par.plant_name || "—"}</p>
+          <p className="text-sm text-muted">{par.plant_address || ""}</p>
         </div>
 
         {/* Equipos */}
@@ -95,7 +102,7 @@ export function ParPreview({ par }) {
               {equipment.some((eq) => eq.observaciones) && (
                 <div className="border-t border-border bg-surface-2/30 px-4 py-3">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-                    Observaciones
+                    Descripción del trabajo a realizar
                   </p>
                   {equipment
                     .filter((eq) => eq.observaciones)
@@ -168,6 +175,7 @@ export function ParPreview({ par }) {
         </div>
 
         {/* Totales */}
+          <div className="mb-3 rounded border border-current/20 p-3 text-sm"><strong>Total de horas presupuestadas: {Number(par.budgeted_hours || 0).toFixed(2)} h</strong><p className="text-xs">Suma de cantidades de mano de obra; horas compartidas entre técnicos.</p></div>
         <div className="flex flex-wrap justify-end gap-4">
           <div className="min-w-40 rounded-xl border border-border bg-surface-2/50 px-5 py-3 text-right">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">Total USD</p>

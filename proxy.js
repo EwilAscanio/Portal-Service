@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import {
   API_PERMISSIONS,
   PAGE_PERMISSIONS,
+  canAccessRole,
   isPublicPath,
   rolesFor,
 } from "@/lib/permissions";
@@ -31,11 +32,18 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl);
   }
 
+  if (session.user?.status !== "Activo") {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Sesión no válida." }, { status: 401 });
+    }
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+
   // Role-based authorization.
   const isApi = pathname.startsWith("/api/");
   const allowedRoles = rolesFor(pathname, isApi ? API_PERMISSIONS : PAGE_PERMISSIONS);
 
-  if (allowedRoles && !allowedRoles.includes(role)) {
+  if (!canAccessRole(role, allowedRoles)) {
     if (isApi) {
       return NextResponse.json({ error: "No autorizado." }, { status: 403 });
     }

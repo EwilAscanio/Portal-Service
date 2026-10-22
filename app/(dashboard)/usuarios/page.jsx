@@ -27,6 +27,7 @@ import { UserCardGrid } from "@/components/users/UserCardGrid";
 import { UserViewModal } from "@/components/users/UserViewModal";
 import { ROLE_BADGE } from "@/lib/status";
 import { cn } from "@/utils/cn";
+import { ACTIVE_STATUS, INACTIVE_STATUS } from "@/lib/par/constants";
 
 function formatDateTime(iso) {
   if (!iso) return "—";
@@ -114,7 +115,7 @@ export default function UsuariosPage() {
 
   const confirmToggle = async () => {
     const { user } = confirm;
-    const newStatus = user.status === "Activo" ? "Inactivo" : "Activo";
+    const newStatus = user.status === ACTIVE_STATUS ? INACTIVE_STATUS : ACTIVE_STATUS;
     try {
       await updateUserStatus(user.id, newStatus);
       notify.success(`Usuario ${newStatus === "Activo" ? "activado" : "desactivado"}.`);
@@ -157,7 +158,7 @@ export default function UsuariosPage() {
       header: "Estado",
       sortable: true,
       render: (row) => (
-        <Badge variant={row.status === "Activo" ? "success" : "danger"} dot>
+        <Badge variant={row.status === ACTIVE_STATUS ? "success" : "danger"} dot>
           {row.status}
         </Badge>
       ),

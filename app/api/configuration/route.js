@@ -3,6 +3,7 @@ import {
   findFirst,
   update,
 } from "@/lib/repositories/configuration.repository";
+import { configurationSchema } from "@/lib/validators";
 
 export async function GET() {
   try {
@@ -19,15 +20,10 @@ export async function GET() {
 
 export async function PUT(request) {
   try {
-    const body = await request.json();
+    const parsed = configurationSchema.safeParse(await request.json());
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "Datos inválidos" }, { status: 400 });
+    const body = parsed.data;
     const { company_name } = body;
-
-    if (!company_name?.trim() && body.exchange_rate == null) {
-      return NextResponse.json(
-        { error: "El nombre de la empresa o la tasa de cambio es obligatorio." },
-        { status: 400 }
-      );
-    }
 
     const config = await update({
       company_name: company_name?.trim() || undefined,
