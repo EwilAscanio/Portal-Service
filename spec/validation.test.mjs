@@ -17,7 +17,7 @@ assert.equal(productSchema.safeParse({ code: "P1", description: "Producto", cost
 assert.equal(equipmentSchema.safeParse({ name: "Equipo", brand: "Marca", model: "M1", serial: "S1", clientId: "not-uuid" }).success, false);
 assert.equal(technicalSchema.safeParse({ cedula: "123", name: "Ana", email: "bad" }).success, false);
 const relationId = "11111111-1111-4111-8111-111111111111";
-const validOrder = { parId: 1, workType: "External", serviceType: "Maintenance", callDate: "2026-09-19T12:00:00.000Z", scheduledStart: "2026-09-20T12:00:00.000Z", scheduledEnd: "2026-09-20T14:00:00.000Z", laborAllocations: [{ parItemId: 1, technicalId: relationId, hours: "1" }] };
+const validOrder = { parId: 1, equipmentIds: [relationId], workType: "External", serviceType: "Maintenance", callDate: "2026-09-19T12:00:00.000Z", scheduledStart: "2026-09-20T12:00:00.000Z", scheduledEnd: "2026-09-20T14:00:00.000Z", laborAllocations: [{ parItemId: 1, technicalId: relationId, hours: "1" }] };
 assert.equal(serviceOrderSchema.safeParse(validOrder).success, true);
 assert.equal(serviceOrderSchema.safeParse({ ...validOrder, orderCode: "OS-MANUAL" }).success, false);
 assert.equal(Object.hasOwn(serviceOrderSchema.parse(validOrder), "orderCode"), false);
@@ -25,6 +25,22 @@ assert.equal(serviceOrderSchema.safeParse({ ...validOrder, callDate: "fecha" }).
 assert.equal(serviceOrderSchema.safeParse({ ...validOrder, scheduledEnd: "2026-09-20T11:00:00.000Z" }).success, false);
 assert.equal(serviceOrderSchema.safeParse({ ...validOrder, technicianIds: [relationId, relationId, relationId, relationId] }).success, false);
 assert.deepEqual(serviceOrderUpdateSchema.parse({ status: "Aprobada" }), { status: "Aprobada" });
+const fiveTechnicians = Array.from({ length: 5 }, (_, index) => ({
+  parItemId: index % 2 + 1,
+  technicalId: `11111111-1111-4111-8111-${String(index + 1).padStart(12, "0")}`,
+  hours: 1,
+}));
+for (const count of [1, 2, 3, 4]) {
+  const laborAllocations = fiveTechnicians.slice(0, count);
+  assert.equal(serviceOrderSchema.safeParse({ ...validOrder, laborAllocations }).success, true);
+  assert.equal(serviceOrderUpdateSchema.safeParse({ laborAllocations }).success, true);
+}
+assert.equal(serviceOrderSchema.safeParse({ ...validOrder, laborAllocations: fiveTechnicians }).success, false);
+assert.equal(serviceOrderUpdateSchema.safeParse({ laborAllocations: fiveTechnicians }).success, false);
+assert.equal(serviceOrderUpdateSchema.safeParse({ laborAllocations: [
+  ...fiveTechnicians.slice(0, 4), { ...fiveTechnicians[0], parItemId: 3 },
+] }).success, true, "La misma persona en otro renglón no cuenta como un quinto técnico");
+assert.equal(serviceOrderUpdateSchema.safeParse({ reviewLabor: true, laborAllocations: [] }).success, true);
 const validParHeader = { clientId: relationId, plantId: relationId, contactId: relationId, exchangeRate: 1, observations: "Trabajo solicitado" };
 assert.equal(parHeaderSchema.safeParse(validParHeader).success, true);
 assert.equal(parHeaderSchema.safeParse({ ...validParHeader, observations: "" }).success, true);

@@ -1,5 +1,6 @@
 "use client";
 
+import { parPurposeLabel } from "@/lib/warranty";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Eye, LayoutTemplate, Plus, Trash2, XCircle } from "lucide-react";
@@ -13,9 +14,9 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { DataTable } from "@/components/tables/DataTable";
 import { ParCardGrid } from "@/components/par/ParCardGrid";
+import { ParConsultationModal } from "@/components/par/ParConsultationModal";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { ConfirmDialog, Modal } from "@/components/ui/Modal";
-import { ReadonlyField } from "@/components/ui/ReadonlyField";
+import { ConfirmDialog } from "@/components/ui/Modal";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Select } from "@/components/ui/Select";
 import { ViewToggle } from "@/components/ui/ViewToggle";
@@ -127,7 +128,7 @@ export default function ParPage() {
       key: "par_number",
       header: "Número",
       render: (row) => (
-        <p className="font-semibold text-foreground">{row.par_number}</p>
+        <p className="font-semibold text-foreground">{row.par_number}<span className="block text-xs font-normal text-muted">{parPurposeLabel(row.purpose)}{Number(row.warranty_open_orders)>0 ? ` · ${row.warranty_open_orders} garantías abiertas` : ""}</span></p>
       ),
     },
     {
@@ -162,7 +163,7 @@ export default function ParPage() {
     },
     {
       key: "total_usd",
-      header: "Total $",
+      header: "Total final USD",
       className: "text-right",
       render: (row) => (
         <span className="font-semibold text-blue-600 dark:text-blue-400">
@@ -172,7 +173,7 @@ export default function ParPage() {
     },
     {
       key: "total_bs",
-      header: "Total Bs",
+      header: "Total final Bs",
       className: "text-right hidden md:table-cell",
       render: (row) => (
         <span className="font-semibold text-emerald-600 dark:text-emerald-400">
@@ -203,9 +204,12 @@ export default function ParPage() {
             icon={Eye}
             onClick={(event) => {
               event.stopPropagation();
-              router.push(`/par/${row.id}`);
+              setViewPar(row);
             }}
-            title="Ver / editar"
+            onKeyDown={(event) => event.stopPropagation()}
+            title="Ver PAR"
+            aria-label={`Ver PAR ${row.par_number}`}
+            aria-haspopup="dialog"
           />
           {effectiveStatus(row) === "Creado" && (
             <>
@@ -310,7 +314,6 @@ export default function ParPage() {
                 pars={visibleRows}
                 loading={loading}
                 onView={setViewPar}
-                onNavigate={(par) => router.push(`/par/${par.id}`)}
                 onApprove={(par) => handleTransition(par, "Aprobado")}
                 onDelete={(par) => setToDelete(par)}
                 onReject={(par) => handleTransition(par, "Rechazado")}
@@ -320,104 +323,17 @@ export default function ParPage() {
         </Card>
       </FadeInUp>
 
-      <Modal
-        open={Boolean(viewPar)}
-        onClose={() => setViewPar(null)}
-        size="2xl"
-        title={viewPar ? `PAR ${viewPar.par_number}` : ""}
-        description={
-          viewPar
-            ? `${viewPar.client_name} · ${viewPar.client_code || "Sin código"}`
-            : undefined
-        }
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setViewPar(null)}>
-              Cerrar
-            </Button>
-            <Button
-              onClick={() => {
-                const id = viewPar?.id;
-                setViewPar(null);
-                if (id) router.push(`/par/${id}`);
-              }}
-            >
-              Abrir PAR
-            </Button>
-          </>
-        }
-      >
-        {viewPar && (
-          <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <ReadonlyField label="Número">
-                <span className="font-semibold text-foreground">
-                  {viewPar.par_number}
-                </span>
-              </ReadonlyField>
-              <ReadonlyField label="Fecha de creación">
-                {formatDate(viewPar.created_at, {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </ReadonlyField>
-              <ReadonlyField label="Tasa de cambio">
-                {viewPar.exchange_rate ?? "—"}
-              </ReadonlyField>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-foreground">
-                  Estado
-                </label>
-                <div className="flex h-11 items-center">
-                  <StatusBadge
-                    status={effectiveStatus(viewPar)}
-                    variants={PAR_STATUS_VARIANTS}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <ReadonlyField label="Cliente">{viewPar.client_name}</ReadonlyField>
-              <ReadonlyField label="Código">
-                {viewPar.client_code || "—"}
-              </ReadonlyField>
-              <ReadonlyField label="Total $">
-                <span className="font-semibold text-blue-600 dark:text-blue-400">
-                  {formatCurrency(viewPar.total_usd)}
-                </span>
-              </ReadonlyField>
-              <ReadonlyField label="Total Bs">
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                  {formatVes(viewPar.total_bs)}
-                </span>
-              </ReadonlyField>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <ReadonlyField label="Equipo principal">
-                {viewPar.main_equipment || "—"}
-              </ReadonlyField>
-              <ReadonlyField label="Contacto">
-                {viewPar.contact_name || "—"}
-              </ReadonlyField>
-              <ReadonlyField label="Planta">
-                {viewPar.plant_name || "—"}
-              </ReadonlyField>
-              <ReadonlyField label="Elaborado por">
-                {viewPar.created_by_name || "—"}
-              </ReadonlyField>
-              <ReadonlyField label="Aprobado por">
-                {viewPar.approved_by_name || "—"}
-              </ReadonlyField>
-            </div>
-
-            <ReadonlyField label="Observaciones">
-              {viewPar.observations || "—"}
-            </ReadonlyField>
-          </div>
-        )}
-      </Modal>
+      {viewPar && (
+        <ParConsultationModal
+          key={viewPar.id}
+          par={viewPar}
+          onClose={() => setViewPar(null)}
+          onManage={(par) => {
+            setViewPar(null);
+            if (par) router.push(`/par/${par.id}`);
+          }}
+        />
+      )}
 
       <ConfirmDialog
         open={Boolean(toDelete)}

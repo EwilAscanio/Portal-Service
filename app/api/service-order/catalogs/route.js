@@ -6,12 +6,12 @@ import { query } from "@/lib/db";
 
 export async function GET() {
   try {
-    const [plants, contacts, technicians, pars] = await Promise.all([
+    const [plants, contacts, technicians, pars, originals] = await Promise.all([
       plantRepo.findAll(),
       contactRepo.findAll(),
       technicalRepo.findAll(),
       query(`
-        SELECT ph.id, ph.par_number, ph.client_id, ph.plant_id, ph.contact_id,
+        SELECT ph.id, ph.par_number, ph.purpose, ph.client_id, ph.plant_id, ph.contact_id,
                c.description AS client_name, c.codclie AS client_code,
                p.name AS plant_name, ct.name AS contact_name,
                (SELECT string_agg(trim(pd.observaciones), E'\n' ORDER BY pd.is_main DESC, pd.item_no, pd.id)
@@ -36,8 +36,9 @@ export async function GET() {
           AND EXISTS (SELECT 1 FROM par_equipment pe WHERE pe.par_id = ph.id AND NULLIF(trim(pe.observaciones), '') IS NOT NULL)
         ORDER BY ph.created_at DESC
       `),
+      query("SELECT so.id,so.order_code,so.par_id,c.description AS client_name,COALESCE((SELECT json_agg(e.equipment_id) FROM service_order_equipment e WHERE e.service_order_id=so.id),'[]'::json) AS equipment_ids FROM service_order so JOIN client c ON c.id=so.client_id WHERE so.status='Completada' ORDER BY so.created_at DESC"),
     ]);
-    return NextResponse.json({ plants, contacts, technicians, pars: pars.rows });
+    return NextResponse.json({ plants, contacts, technicians, pars: pars.rows, originals: originals.rows });
   } catch (error) {
     console.error("Error al cargar catálogos de órdenes:", error);
     return NextResponse.json({ error: "No se pudieron cargar los catálogos de órdenes." }, { status: 500 });

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parDiscountPercentSchema } from "@/lib/validators/par.schema";
 
 export const equipmentRowSchema = z.object({
   itemNo: z.coerce.number().optional(),
@@ -27,11 +28,13 @@ export const itemRowSchema = z.object({
 });
 
 export const parFormSchema = z.object({
+  purpose: z.enum(["Comercial","ReferenciaGarantia"]).optional(),
   clientId: z.string().min(1, "Seleccione un cliente."),
   plantId: z.string().min(1, "Seleccione una planta."),
   contactId: z.string().min(1, "Seleccione un contacto."),
   fechaEmision: z.string().optional().or(z.literal("")),
   exchangeRate: z.string().optional().or(z.literal("")),
+  discountPercent: parDiscountPercentSchema.optional(),
   observations: z.string().optional().or(z.literal("")),
   elaboradoPor: z.string().optional().or(z.literal("")),
   equipment: z.array(equipmentRowSchema).optional(),
@@ -44,6 +47,7 @@ export const FIELD_LABELS = {
   contactId: "Contacto",
   fechaEmision: "Fecha de emisión",
   exchangeRate: "Tasa vigente",
+  discountPercent: "Descuento %",
   observations: "Observaciones generales",
   elaboradoPor: "Elaborado por",
   tipo: "Tipo",

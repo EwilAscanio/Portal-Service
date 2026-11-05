@@ -1,3 +1,4 @@
+import { parPurposeLabel } from "@/lib/warranty";
 import { formatNumber } from "@/utils/parCalc";
 
 /**
@@ -14,7 +15,7 @@ export function ParPrintSheet({ par }) {
   const fecha = par.fecha_emision ? String(par.fecha_emision).slice(0, 10) : "";
 
   return (
-    <div className="hidden print:block">
+    <div className="hidden print:block"><p className="my-2 text-sm font-semibold">{parPurposeLabel(par.purpose)}{par.purpose === "ReferenciaGarantia" ? " · Sin importe comercial ni horas cotizadas" : ""}{Number(par.warranty_open_orders)>0 ? ` · ${par.warranty_open_orders} garantías abiertas` : ""}</p>
       <div className="mx-auto max-w-5xl px-4 print:my-0 print:max-w-none print:px-0">
         <div className="border-2 border-slate-800 bg-white p-6 font-sans text-slate-900 sm:p-8 print:border print:p-4 print:m-0 print:shadow-none">
           {/* Encabezado del documento */}
@@ -184,8 +185,16 @@ export function ParPrintSheet({ par }) {
           {/* Totales */}
           <div className="mb-3 rounded border border-current/20 p-3 text-sm"><strong>Total de horas presupuestadas: {Number(par.budgeted_hours || 0).toFixed(2)} h</strong><p className="text-xs">Suma de cantidades de mano de obra; horas compartidas entre técnicos.</p></div>
           <div className="mb-4 border border-slate-800 text-xs">
+            <div className="grid grid-cols-12 border-b border-slate-800">
+              <div className="col-span-6 p-2 text-right font-bold uppercase">Subtotal USD</div>
+              <div className="col-span-3 p-2 text-right font-mono">$ {formatNumber(par.subtotal_usd)}</div>
+            </div>
+            <div className="grid grid-cols-12 border-b border-slate-800">
+              <div className="col-span-6 p-2 text-right font-bold uppercase">Descuento ({formatNumber(par.discount_percent)} %)</div>
+              <div className="col-span-3 p-2 text-right font-mono">− $ {formatNumber(par.discount_amount_usd)}</div>
+            </div>
             <div className="grid grid-cols-12 bg-slate-200 font-bold">
-              <div className="col-span-6 p-2 text-right text-sm uppercase">TOTAL</div>
+              <div className="col-span-6 p-2 text-right text-sm uppercase">TOTAL FINAL</div>
               <div className="col-span-3 p-2 text-right font-mono text-sm text-indigo-950">
                 $ {formatNumber(totalUsd)}
               </div>

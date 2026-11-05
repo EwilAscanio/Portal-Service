@@ -27,7 +27,7 @@ CREATE UNIQUE INDEX service_order_one_lead_technician_idx ON service_order_techn
 CREATE INDEX service_order_technician_technical_id_idx ON service_order_technician(technical_id);
 CREATE INDEX service_order_calendar_range_idx ON service_order(scheduled_start,scheduled_end) WHERE approved_at IS NOT NULL AND status <> 'Cancelada';
 CREATE INDEX service_order_calendar_status_idx ON service_order(status,service_type,priority) WHERE approved_at IS NOT NULL;
-CREATE OR REPLACE FUNCTION enforce_service_order_technician_limit() RETURNS TRIGGER AS $$ BEGIN IF (SELECT COUNT(*) FROM service_order_technician WHERE service_order_id = NEW.service_order_id) >= 3 THEN RAISE EXCEPTION 'Una orden de servicio admite un maximo de 3 tecnicos' USING ERRCODE = '23514'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE OR REPLACE FUNCTION enforce_service_order_technician_limit() RETURNS TRIGGER AS $$ BEGIN IF (SELECT COUNT(*) FROM service_order_technician WHERE service_order_id = NEW.service_order_id) >= 4 THEN RAISE EXCEPTION 'Una orden de servicio admite un maximo de 4 tecnicos' USING ERRCODE = '23514'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql;
 CREATE TRIGGER service_order_technician_limit BEFORE INSERT ON service_order_technician FOR EACH ROW EXECUTE FUNCTION enforce_service_order_technician_limit();
 CREATE TABLE notification (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, type VARCHAR(30) NOT NULL, title VARCHAR(200) NOT NULL, description TEXT, read BOOLEAN NOT NULL DEFAULT false, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE TABLE par_header (id SERIAL PRIMARY KEY, par_number VARCHAR(20) NOT NULL UNIQUE, client_id UUID NOT NULL REFERENCES client(id), plant_id UUID NOT NULL REFERENCES plant(id) ON DELETE RESTRICT, contact_id UUID NOT NULL REFERENCES contact(id) ON DELETE RESTRICT, status VARCHAR(20) NOT NULL DEFAULT 'Creado' CHECK (status IN ('Creado','Aprobado','En Servicio','Finalizado','Rechazado')), exchange_rate NUMERIC(14,4) NOT NULL DEFAULT 0 CHECK (exchange_rate >= 0), fecha_emision DATE, observations TEXT, elaborado_por VARCHAR(120), total_usd NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (total_usd >= 0), total_bs NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (total_bs >= 0), created_by UUID NOT NULL REFERENCES users(id), approved_by UUID REFERENCES users(id), approved_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), CONSTRAINT par_header_order_scope_unique UNIQUE(id,client_id,plant_id,contact_id), CONSTRAINT par_header_plant_client_fk FOREIGN KEY(plant_id,client_id) REFERENCES plant(id,client_id) ON DELETE RESTRICT, CONSTRAINT par_header_contact_scope_fk FOREIGN KEY(contact_id,client_id,plant_id) REFERENCES contact(id,client_id,plant_id) ON DELETE RESTRICT);
@@ -371,3 +371,296 @@ CREATE TABLE service_order_closure_event (
 );
 CREATE INDEX service_order_closure_event_order_idx ON service_order_closure_event(service_order_id, id);
 CREATE INDEX service_order_closure_event_actor_idx ON service_order_closure_event(actor_id);
+
+-- 053: descuento general del PAR; la base nueva inicia sin importes históricos.
+ALTER TABLE par_header
+  ADD COLUMN discount_percent NUMERIC(5,2) NOT NULL DEFAULT 0
+    CONSTRAINT par_header_discount_percent_check CHECK (discount_percent BETWEEN 0 AND 100),
+  ADD COLUMN subtotal_usd NUMERIC(14,2) NOT NULL DEFAULT 0
+    CONSTRAINT par_header_subtotal_check CHECK (subtotal_usd >= 0),
+  ADD COLUMN discount_amount_usd NUMERIC(14,2) NOT NULL DEFAULT 0,
+  ADD CONSTRAINT par_header_discount_amount_check
+    CHECK (discount_amount_usd >= 0 AND discount_amount_usd <= subtotal_usd),
+  ADD CONSTRAINT par_header_discount_total_check
+    CHECK (total_usd = subtotal_usd - discount_amount_usd);
+COMMENT ON COLUMN par_header.discount_percent IS 'Porcentaje de descuento general, 0 a 100; editable con los permisos del PAR.';
+COMMENT ON COLUMN par_header.subtotal_usd IS 'Suma de importes de renglones antes del descuento general.';
+COMMENT ON COLUMN par_header.discount_amount_usd IS 'Monto USD calculado: subtotal por porcentaje, redondeado a dos decimales.';
+
+-- Vacaciones por días completos y reprogramación auditada de O/S antes de iniciar.
+-- No modifica estados, técnicos, horas ni aprobaciones de documentos existentes.
+
+
+CREATE TABLE technical_vacation (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  technical_id UUID NOT NULL REFERENCES technical(id) ON DELETE RESTRICT,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  note TEXT,
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision > 0),
+  created_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  cancelled_by UUID REFERENCES users(id) ON DELETE RESTRICT,
+  cancelled_at TIMESTAMPTZ,
+  cancellation_reason TEXT,
+  CHECK (start_date >= DATE '1900-01-01' AND end_date <= DATE '9998-12-31' AND end_date >= start_date),
+  CHECK ((cancelled_at IS NULL AND cancelled_by IS NULL AND cancellation_reason IS NULL)
+    OR (cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL AND cancellation_reason IS NOT NULL AND length(trim(cancellation_reason)) >= 5))
+);
+CREATE INDEX technical_vacation_period_idx ON technical_vacation(technical_id,start_date,end_date) WHERE cancelled_at IS NULL;
+CREATE TABLE technical_vacation_event (
+  id BIGSERIAL PRIMARY KEY,
+  vacation_id UUID NOT NULL REFERENCES technical_vacation(id) ON DELETE RESTRICT,
+  actor_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  action VARCHAR(20) NOT NULL CHECK (action IN ('Registradas','Modificadas','Canceladas')),
+  reason TEXT,
+  details JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX technical_vacation_event_vacation_idx ON technical_vacation_event(vacation_id,id);
+
+ALTER TABLE service_order ADD COLUMN schedule_revision INTEGER NOT NULL DEFAULT 0 CHECK (schedule_revision >= 0);
+CREATE TABLE service_order_schedule_event (
+  id BIGSERIAL PRIMARY KEY,
+  service_order_id INTEGER NOT NULL REFERENCES service_order(id) ON DELETE RESTRICT,
+  actor_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  action VARCHAR(20) NOT NULL CHECK (action IN ('Reprogramada','Aprobada')),
+  reason TEXT,
+  details JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX service_order_schedule_event_order_idx ON service_order_schedule_event(service_order_id,id);
+
+-- 056-service-order-photos-pending
+
+CREATE TABLE service_order_photo (
+  id UUID PRIMARY KEY,
+  service_order_id INTEGER NOT NULL REFERENCES service_order(id) ON DELETE RESTRICT,
+  slot SMALLINT NOT NULL CHECK (slot BETWEEN 1 AND 5),
+  storage_key TEXT NOT NULL UNIQUE,
+  original_name VARCHAR(255) NOT NULL,
+  mime_type TEXT NOT NULL CHECK (mime_type IN ('image/jpeg','image/png')),
+  byte_size INTEGER NOT NULL CHECK (byte_size > 0 AND byte_size <= 10485760),
+  sha256 TEXT NOT NULL,
+  uploaded_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  retired_by UUID REFERENCES users(id) ON DELETE RESTRICT,
+  retired_at TIMESTAMPTZ,
+  retirement_reason TEXT,
+  CHECK ((retired_at IS NULL AND retired_by IS NULL AND retirement_reason IS NULL)
+    OR (retired_at IS NOT NULL AND retired_by IS NOT NULL AND length(trim(retirement_reason)) >= 5))
+);
+-- Cinco posiciones vigentes: el límite también se cumple ante escrituras concurrentes.
+CREATE UNIQUE INDEX service_order_photo_slot_idx ON service_order_photo(service_order_id,slot) WHERE retired_at IS NULL;
+CREATE INDEX service_order_photo_order_idx ON service_order_photo(service_order_id);
+
+ALTER TABLE service_order ADD CONSTRAINT service_order_pending_scope_unique UNIQUE(id,par_id,client_id,plant_id);
+CREATE TABLE service_pending_item (
+  id UUID PRIMARY KEY,
+  service_order_id INTEGER NOT NULL,
+  par_id INTEGER NOT NULL,
+  client_id UUID NOT NULL,
+  plant_id UUID NOT NULL,
+  description TEXT NOT NULL CHECK (length(trim(description)) BETWEEN 1 AND 2000),
+  position INTEGER NOT NULL CHECK (position >= 0),
+  status VARCHAR(20) NOT NULL DEFAULT 'Borrador' CHECK (status IN ('Borrador','Pendiente','Completado')),
+  created_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  retired_at TIMESTAMPTZ,
+  retired_by UUID REFERENCES users(id) ON DELETE RESTRICT,
+  published_at TIMESTAMPTZ,
+  published_by UUID REFERENCES users(id) ON DELETE RESTRICT,
+  client_code VARCHAR(20), client_name TEXT, plant_code VARCHAR(50), plant_name TEXT,
+  order_code VARCHAR(20), par_number VARCHAR(20),
+  completed_at TIMESTAMPTZ,
+  completed_by UUID REFERENCES users(id) ON DELETE RESTRICT,
+  resolution TEXT,
+  revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
+  FOREIGN KEY(service_order_id,par_id,client_id,plant_id) REFERENCES service_order(id,par_id,client_id,plant_id) ON DELETE RESTRICT,
+  CHECK ((retired_at IS NULL) = (retired_by IS NULL)),
+  CHECK ((status='Borrador' AND published_at IS NULL AND published_by IS NULL)
+    OR (status IN ('Pendiente','Completado') AND published_at IS NOT NULL AND published_by IS NOT NULL
+      AND retired_at IS NULL AND client_code IS NOT NULL AND plant_name IS NOT NULL AND order_code IS NOT NULL)),
+  CHECK ((status='Completado' AND completed_at IS NOT NULL AND completed_by IS NOT NULL AND resolution IS NOT NULL AND length(trim(resolution)) BETWEEN 5 AND 2000)
+    OR (status<>'Completado' AND completed_at IS NULL AND completed_by IS NULL AND resolution IS NULL))
+);
+CREATE INDEX service_pending_order_idx ON service_pending_item(service_order_id);
+CREATE INDEX service_pending_open_idx ON service_pending_item(published_at,id) WHERE status='Pendiente';
+CREATE INDEX service_pending_scope_idx ON service_pending_item(client_id,plant_id,status) WHERE published_at IS NOT NULL;
+
+CREATE TABLE service_pending_event (
+  id BIGSERIAL PRIMARY KEY,
+  pending_id UUID NOT NULL REFERENCES service_pending_item(id) ON DELETE RESTRICT,
+  actor_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  action TEXT NOT NULL CHECK (action IN ('Publicado','Completado')),
+  details JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX service_pending_event_item_idx ON service_pending_event(pending_id,id);
+
+-- Resolver el seguimiento no reescribe lo que se reportó en el expediente cerrado.
+CREATE FUNCTION preserve_published_pending() RETURNS TRIGGER AS $$
+BEGIN
+  IF OLD.published_at IS NOT NULL THEN
+    IF TG_OP='DELETE' THEN RAISE EXCEPTION 'Un pendiente publicado conserva su historial' USING ERRCODE='23514'; END IF;
+    IF (to_jsonb(NEW) - ARRAY['status','completed_at','completed_by','resolution','revision','updated_at','updated_by'])
+       IS DISTINCT FROM (to_jsonb(OLD) - ARRAY['status','completed_at','completed_by','resolution','revision','updated_at','updated_by'])
+       OR OLD.status='Completado' OR NEW.status<>'Completado' THEN
+      RAISE EXCEPTION 'El origen publicado es inmutable y solo admite completar el seguimiento' USING ERRCODE='23514';
+    END IF;
+  END IF;
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER preserve_published_pending_trigger BEFORE UPDATE OR DELETE ON service_pending_item
+FOR EACH ROW EXECUTE FUNCTION preserve_published_pending();
+
+-- 057-service-order-warranty
+-- Garantías independientes del presupuesto comercial; no reconstruye servicios históricos.
+ALTER TABLE par_header ADD COLUMN purpose VARCHAR(30) NOT NULL DEFAULT 'Comercial'
+  CHECK (purpose IN ('Comercial','ReferenciaGarantia'));
+ALTER TABLE par_header ADD CONSTRAINT par_reference_zero_check CHECK
+  (purpose <> 'ReferenciaGarantia' OR (budgeted_hours=0 AND subtotal_usd=0 AND discount_percent=0
+    AND discount_amount_usd=0 AND total_usd=0 AND total_bs=0));
+
+CREATE FUNCTION preserve_par_purpose() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.purpose IS DISTINCT FROM OLD.purpose THEN RAISE EXCEPTION 'La finalidad del PAR no se puede convertir' USING ERRCODE='23514'; END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER preserve_par_purpose_trigger BEFORE UPDATE OF purpose ON par_header
+  FOR EACH ROW EXECUTE FUNCTION preserve_par_purpose();
+
+-- Los renglones de referencia identifican productos, no ventas ni presupuestos inventados.
+CREATE FUNCTION normalize_reference_par_item() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM par_header WHERE id=NEW.par_id AND purpose='ReferenciaGarantia') THEN
+    NEW.qty:=0; NEW.valor_unit_usd:=0; NEW.valor_percent:=0; NEW.line_total_usd:=0; NEW.multiplicador:=1;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER normalize_reference_par_item_trigger BEFORE INSERT OR UPDATE ON par_item
+  FOR EACH ROW EXECUTE FUNCTION normalize_reference_par_item();
+
+ALTER TABLE service_order
+  ADD COLUMN order_kind VARCHAR(15) NOT NULL DEFAULT 'Normal' CHECK (order_kind IN ('Normal','Garantia')),
+  ADD COLUMN warranty_origin VARCHAR(15) CHECK (warranty_origin IN ('Registered','External')),
+  ADD COLUMN warranty_origin_order_id INTEGER REFERENCES service_order(id) ON DELETE RESTRICT,
+  ADD COLUMN warranty_reference VARCHAR(500),
+  ADD COLUMN warranty_service_date DATE,
+  ADD COLUMN warranty_reason TEXT,
+  ADD CONSTRAINT service_order_warranty_check CHECK (
+    (order_kind='Normal' AND warranty_origin IS NULL AND warranty_origin_order_id IS NULL
+      AND warranty_reference IS NULL AND warranty_service_date IS NULL AND warranty_reason IS NULL)
+    OR (order_kind='Garantia' AND warranty_origin IS NOT NULL AND warranty_reason IS NOT NULL
+      AND length(trim(warranty_reason)) BETWEEN 5 AND 2000
+      AND ((warranty_origin='Registered' AND warranty_origin_order_id IS NOT NULL AND warranty_origin_order_id<>id
+          AND warranty_reference IS NULL AND warranty_service_date IS NULL)
+        OR (warranty_origin='External' AND warranty_origin_order_id IS NULL AND warranty_reference IS NOT NULL
+          AND length(trim(warranty_reference)) BETWEEN 5 AND 500))));
+
+CREATE FUNCTION validate_service_order_warranty() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP='UPDATE' AND (NEW.order_kind,NEW.warranty_origin,NEW.warranty_origin_order_id,NEW.warranty_reference,NEW.warranty_service_date)
+      IS DISTINCT FROM (OLD.order_kind,OLD.warranty_origin,OLD.warranty_origin_order_id,OLD.warranty_reference,OLD.warranty_service_date) THEN
+    RAISE EXCEPTION 'El origen de la garantía no se puede cambiar' USING ERRCODE='23514';
+  END IF;
+  IF NEW.order_kind='Normal' AND EXISTS (SELECT 1 FROM par_header WHERE id=NEW.par_id AND purpose='ReferenciaGarantia') THEN
+    RAISE EXCEPTION 'Un PAR de referencia solo admite garantías' USING ERRCODE='23514';
+  END IF;
+  IF NEW.warranty_origin='Registered' AND NOT EXISTS (
+    SELECT 1 FROM service_order o WHERE o.id=NEW.warranty_origin_order_id AND o.status='Completada'
+      AND o.par_id=NEW.par_id AND o.client_id=NEW.client_id AND o.plant_id=NEW.plant_id) THEN
+    RAISE EXCEPTION 'La garantía requiere una O/S completada del mismo PAR y ámbito' USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER validate_service_order_warranty_trigger BEFORE INSERT OR UPDATE ON service_order
+  FOR EACH ROW EXECUTE FUNCTION validate_service_order_warranty();
+CREATE INDEX service_order_warranty_origin_idx ON service_order(warranty_origin_order_id) WHERE warranty_origin_order_id IS NOT NULL;
+CREATE INDEX service_order_kind_par_idx ON service_order(par_id,order_kind,status);
+
+CREATE FUNCTION validate_warranty_equipment() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE origin_id INTEGER;
+BEGIN
+  SELECT warranty_origin_order_id INTO origin_id FROM service_order WHERE id=NEW.service_order_id;
+  IF origin_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM service_order_equipment WHERE service_order_id=origin_id AND equipment_id=NEW.equipment_id) THEN
+    RAISE EXCEPTION 'El equipo debe pertenecer a la O/S de origen' USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER validate_warranty_equipment_trigger BEFORE INSERT OR UPDATE ON service_order_equipment
+  FOR EACH ROW EXECUTE FUNCTION validate_warranty_equipment();
+
+-- 058-technician-unavailability
+-- Generaliza vacaciones sin reemplazar filas ni reescribir snapshots de auditoría.
+SET LOCAL lock_timeout = '10s';
+
+ALTER TABLE technical_vacation RENAME TO technical_unavailability;
+ALTER TABLE technical_vacation_event RENAME TO technical_unavailability_event;
+ALTER TABLE technical_unavailability_event RENAME COLUMN vacation_id TO unavailability_id;
+
+-- El valor inicial clasifica todos los períodos existentes, incluidos los cancelados.
+-- Las nuevas escrituras deben indicar explícitamente el motivo.
+ALTER TABLE technical_unavailability ADD COLUMN reason_type VARCHAR(24) NOT NULL DEFAULT 'Vacaciones';
+ALTER TABLE technical_unavailability ALTER COLUMN reason_type DROP DEFAULT;
+ALTER TABLE technical_unavailability ADD CONSTRAINT technical_unavailability_reason_type_check
+  CHECK (reason_type IN ('Vacaciones','DiasCompensatorios','Enfermedad','Permisos','Otros'));
+ALTER TABLE technical_unavailability ADD CONSTRAINT technical_unavailability_other_note_check
+  CHECK (reason_type <> 'Otros' OR (note IS NOT NULL AND length(trim(note)) >= 5));
+
+-- Renombrar también las restricciones mantiene legible el catálogo físico.
+-- PostgreSQL conserva las referencias por OID y renombra los índices de las PK.
+DO $$
+DECLARE item RECORD;
+BEGIN
+  FOR item IN
+    SELECT conrelid::regclass AS relation, conname FROM pg_constraint
+    WHERE conrelid IN ('technical_unavailability'::regclass,'technical_unavailability_event'::regclass)
+      AND conname LIKE '%vacation%'
+  LOOP
+    EXECUTE format('ALTER TABLE %s RENAME CONSTRAINT %I TO %I', item.relation,
+      item.conname, replace(item.conname,'vacation','unavailability'));
+  END LOOP;
+END $$;
+ALTER INDEX technical_vacation_period_idx RENAME TO technical_unavailability_period_idx;
+ALTER INDEX technical_vacation_event_vacation_idx RENAME TO technical_unavailability_event_unavailability_idx;
+ALTER SEQUENCE technical_vacation_event_id_seq RENAME TO technical_unavailability_event_id_seq;
+
+COMMENT ON TABLE technical_unavailability IS 'Períodos de no disponibilidad por días completos inclusivos, interpretados en America/Caracas; independiente del estado Activo/Inactivo.';
+COMMENT ON COLUMN technical_unavailability.reason_type IS 'Categoría administrativa restringida; calendarios y selectores públicos exponen solo fechas y bloqueo.';
+COMMENT ON TABLE technical_unavailability_event IS 'Historial conservado. Snapshots anteriores a 058 no incluyen reason_type y representan Vacaciones; no reescribirlos.';
+
+-- 059-vendor
+-- Catálogo Saint de solo lectura. No referencia PAR ni órdenes.
+CREATE TABLE vendor (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  codvend VARCHAR(20) NOT NULL UNIQUE,
+  description VARCHAR(255),
+  cedula VARCHAR(30),
+  phone VARCHAR(30),
+  status VARCHAR(5) NOT NULL DEFAULT '1' CHECK (status IN ('0','1')),
+  email VARCHAR(150),
+  country VARCHAR(100),
+  state VARCHAR(100),
+  city VARCHAR(100),
+  source_system VARCHAR(30) NOT NULL DEFAULT 'Saint',
+  last_synced_at TIMESTAMPTZ,
+  last_seen_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX vendor_cedula_idx ON vendor(cedula) WHERE cedula IS NOT NULL;
+DROP TRIGGER IF EXISTS vendor_set_updated_at ON vendor;
+CREATE TRIGGER vendor_set_updated_at
+  BEFORE UPDATE ON vendor
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+COMMENT ON TABLE vendor IS 'Catálogo Saint de vendedores. status usa 1/0. country, state y city guardan cod_saint.';
+COMMENT ON COLUMN vendor.codvend IS 'Código Saint CodVend. Clave de sincronización.';
+COMMENT ON COLUMN vendor.cedula IS 'Cédula proveniente de ID3. Puede repetirse o quedar vacía.';
+COMMENT ON COLUMN vendor.status IS 'Estado Saint: 1 activo, 0 inactivo. No usar Activo/Inactivo.';

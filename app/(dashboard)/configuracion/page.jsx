@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Monitor, Moon, Sun, RefreshCw, Globe, MapPin, Building2, Image as ImageIcon, DollarSign, ArrowRight, FileUp } from "lucide-react";
+import { Monitor, Moon, Sun, RefreshCw, Globe, MapPin, Building2, Image as ImageIcon, DollarSign, ArrowRight, FileUp, Users } from "lucide-react";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { notify } from "@/lib/toast";
 import { getPublicError } from "@/lib/ui-errors";
-import { syncUbicacion, getConfiguration, updateConfiguration } from "@/lib/api";
+import { syncUbicacion, syncVendors, getConfiguration, updateConfiguration } from "@/lib/api";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -216,6 +216,18 @@ export default function ConfiguracionPage() {
       notify.success(`${label} sincronizados`, { description: data.message });
     } catch (error) {
       notify.error("Error de sincronización", { description: getPublicError(error, "No se pudo sincronizar la ubicación.") });
+    } finally {
+      setSyncing(null);
+    }
+  };
+
+  const handleSyncVendors = async () => {
+    try {
+      setSyncing("vendedores");
+      const data = await syncVendors();
+      notify.success("Vendedores sincronizados", { description: data.message });
+    } catch (error) {
+      notify.error("Error de sincronización", { description: getPublicError(error, "No se pudieron sincronizar los vendedores.") });
     } finally {
       setSyncing(null);
     }
@@ -577,7 +589,7 @@ export default function ConfiguracionPage() {
             <div>
               <CardTitle>Sincronización Saint ERP</CardTitle>
               <CardDescription>
-                Tablas de referencia: Países, Estados y Ciudades. Se guardan en PostgreSQL.
+                Tablas de referencia: Países, Estados, Ciudades y Vendedores. Se guardan en PostgreSQL.
               </CardDescription>
             </div>
           </CardHeader>
@@ -607,9 +619,17 @@ export default function ConfiguracionPage() {
               >
                 Sincronizar Ciudades
               </Button>
+              <Button
+                variant="secondary"
+                icon={syncing === "vendedores" ? undefined : Users}
+                loading={syncing === "vendedores"}
+                onClick={handleSyncVendors}
+              >
+                Sincronizar Vendedores
+              </Button>
             </div>
             <p className="mt-3 text-xs text-muted">
-              Ordén recomendado: Países → Estados → Ciudades. Estas tablas no cambian frecuentemente.
+              Orden recomendado: Países → Estados → Ciudades. Los vendedores usan esos códigos para mostrar país, estado y ciudad.
             </p>
           </CardContent>
         </Card>

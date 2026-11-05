@@ -1,5 +1,6 @@
 "use client";
 
+import { parPurposeLabel } from "@/lib/warranty";
 import { useState } from "react";
 import {
   CalendarDays,
@@ -53,7 +54,7 @@ function effectiveStatus(row) {
   return row.display_status ?? row.status;
 }
 
-export function ParCardGrid({ pars, loading, onView, onNavigate, onApprove, onDelete, onReject }) {
+export function ParCardGrid({ pars, loading, onView, onApprove, onDelete, onReject }) {
   const [page, setPage] = useState(1);
 
   const [prevPars, setPrevPars] = useState(pars);
@@ -99,6 +100,8 @@ export function ParCardGrid({ pars, loading, onView, onNavigate, onApprove, onDe
   }
 
   const handleKeyDown = (event, par) => {
+    // Los botones internos conservan su propia acción al usar el teclado.
+    if (event.target !== event.currentTarget) return;
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       onView(par);
@@ -122,7 +125,8 @@ export function ParCardGrid({ pars, loading, onView, onNavigate, onApprove, onDe
               <CardContent className="flex flex-1 flex-col gap-2 p-4">
                 <div className="flex items-start justify-between gap-2">
                   <span className="flex h-7 items-center rounded-lg bg-blue-500/10 px-2 font-mono text-[11px] font-bold text-blue-600 ring-1 ring-inset ring-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400">
-                    {par.par_number}
+                    {par.par_number}<span className="block text-xs font-normal">{parPurposeLabel(par.purpose)}</span>
+                    {Number(par.warranty_open_orders) > 0 && <span className="block text-xs font-normal text-amber-600">{par.warranty_open_orders} garantías abiertas</span>}
                   </span>
                   <StatusBadge
                     status={effectiveStatus(par)}
@@ -159,13 +163,13 @@ export function ParCardGrid({ pars, loading, onView, onNavigate, onApprove, onDe
 
                 <div className="mt-auto space-y-1 pt-2">
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-xs text-muted">Total $</span>
+                    <span className="text-xs text-muted">Total final USD</span>
                     <span className="text-sm font-bold tracking-tight text-blue-600 dark:text-blue-400">
                       {formatCurrency(par.total_usd)}
                     </span>
                   </div>
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-xs text-muted">Total Bs</span>
+                    <span className="text-xs text-muted">Total final Bs</span>
                     <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
                       {formatVes(par.total_bs)}
                     </span>
@@ -178,8 +182,10 @@ export function ParCardGrid({ pars, loading, onView, onNavigate, onApprove, onDe
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    onNavigate(par);
+                    onView(par);
                   }}
+                  aria-haspopup="dialog"
+                  aria-label={`Ver PAR ${par.par_number}`}
                   className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-blue-500"
                 >
                   <Eye className="h-3.5 w-3.5" />

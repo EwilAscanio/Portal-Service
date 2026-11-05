@@ -15,13 +15,10 @@ import {
   User,
 } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { ReadonlyField } from "@/components/ui/ReadonlyField";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { Stagger, FadeInUp } from "@/components/ui/animated";
-import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/utils/cn";
 
 const PAGE_SIZE = 12;
@@ -49,15 +46,17 @@ function CardSkeleton() {
 /**
  * Vista de tarjetas para contactos.
  * Recibe la lista ya filtrada por búsqueda/cliente y pagina 12 por página.
+ * Delega la consulta a la página para compartir el modal con la tabla.
  */
-export function ContactCardGrid({ contacts, loading, onEdit, onDelete }) {
+export function ContactCardGrid({ contacts, loading, onView, onEdit, onDelete }) {
   const [page, setPage] = useState(1);
-  const [viewContact, setViewContact] = useState(null);
 
   const handleCardKeyDown = (event, row) => {
+    // Los botones internos conservan su activación de teclado sin abrir la consulta.
+    if (event.target !== event.currentTarget) return;
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      setViewContact(row);
+      onView(row);
     }
   };
 
@@ -110,7 +109,7 @@ export function ContactCardGrid({ contacts, loading, onEdit, onDelete }) {
           <FadeInUp key={row.id} className="h-full">
             <Card
               className="flex h-full cursor-pointer flex-col transition-colors hover:border-blue-500/40"
-              onClick={() => setViewContact(row)}
+              onClick={() => onView(row)}
               onKeyDown={(event) => handleCardKeyDown(event, row)}
               role="button"
               tabIndex={0}
@@ -244,54 +243,6 @@ export function ContactCardGrid({ contacts, loading, onEdit, onDelete }) {
         </div>
       </div>
 
-      {viewContact && (
-        <Modal
-          open={Boolean(viewContact)}
-          onClose={() => setViewContact(null)}
-          size="lg"
-          title="Detalle de contacto"
-          description="Información del contacto."
-          footer={
-            <>
-              <Button variant="secondary" onClick={() => setViewContact(null)}>
-                Cerrar
-              </Button>
-              <Button
-                icon={Pencil}
-                onClick={() => {
-                  setViewContact(null);
-                  onEdit(viewContact);
-                }}
-              >
-                Editar
-              </Button>
-            </>
-          }
-        >
-          <div className="space-y-4">
-            <ReadonlyField label="Nombre y Apellido" icon={User}>
-              {viewContact.name || "—"}
-            </ReadonlyField>
-            <ReadonlyField label="Cliente" icon={Building2}>
-              {viewContact.client_name || "—"}
-            </ReadonlyField>
-            <ReadonlyField label="Planta" icon={Factory}>
-              {viewContact.plant_name || "—"}
-            </ReadonlyField>
-            <ReadonlyField label="Departamento" icon={Briefcase}>
-              {viewContact.department || "—"}
-            </ReadonlyField>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <ReadonlyField label="Teléfono" icon={Phone}>
-                {viewContact.phone || "—"}
-              </ReadonlyField>
-              <ReadonlyField label="Email" icon={Mail}>
-                {viewContact.email || "—"}
-              </ReadonlyField>
-            </div>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 }

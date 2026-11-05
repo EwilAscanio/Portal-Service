@@ -7,9 +7,12 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { useAuth } from "@/hooks/useAuth";
 import { notify } from "@/lib/toast";
 import { deleteOrder, getOrderById, updateOrder } from "@/lib/api";
-import { getPublicError } from "@/lib/ui-errors";
+import { getSchedulingError as getPublicError } from "@/lib/ui-errors";
+import { canManageWarranty } from "@/lib/warranty";
+import { ServiceOrderReschedule } from "@/components/service-orders/ServiceOrderReschedule";
+import { ServiceOrderScheduleHistory } from "@/components/service-orders/ServiceOrderScheduleHistory";
 import { canApproveServiceOrder, canEditServiceOrder } from "@/lib/service-order-policy";
-import { canCloseServiceOrder } from "@/lib/service-order-closure";
+import { canManageClosure } from "@/lib/service-order-closure";
 import { ServiceOrderClosure } from "@/components/service-orders/ServiceOrderClosure";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -94,10 +97,10 @@ export default function OrdenDetallePage() {
   if (loading) return <Card><CardContent className="py-10 text-center text-sm text-muted">Cargando…</CardContent></Card>;
   if (notFound || !order) return <Card><CardContent className="space-y-4 py-10 text-center"><p>La orden solicitada no existe.</p><Button icon={ArrowLeft} onClick={() => router.push("/ordenes")}>Volver a Órdenes</Button></CardContent></Card>;
 
-  const editable = canEditServiceOrder(order.status) && !order.labor_review_required;
+  const editable = canEditServiceOrder(order.status) && !order.labor_review_required && (order.order_kind !== "Garantia" || canManageWarranty(user?.role));
   const canApprove = order.status === "Pendiente" && !order.labor_review_required && canApproveServiceOrder(user?.role);
   const canReview = order.labor_review_required && order.status !== "Cancelada" && canApproveServiceOrder(user?.role);
-  const canCancel = !["Completada", "Cancelada"].includes(order.status);
+  const canCancel = (order.order_kind !== "Garantia" || canManageWarranty(user?.role)) && !["Completada", "Cancelada"].includes(order.status);
 
   return (
     <div className="space-y-6">
@@ -107,13 +110,16 @@ export default function OrdenDetallePage() {
         description={`PAR ${order.par_number} · ${order.client_name}`}
         actions={<>
           {canReview && view !== "review" && <Button variant="secondary" onClick={() => setView("review")}>Revisar horas anteriores</Button>}
+          {order.status === "Completada" && canManageWarranty(user?.role) && <Button variant="secondary" onClick={()=>router.push(`/ordenes/nueva?garantiaDe=${order.id}`)}>Crear O/S de garantía</Button>}
+          {order.status === "Aprobada" && !order.labor_review_required && canApproveServiceOrder(user?.role) && view !== "reschedule" && <Button variant="secondary" onClick={() => setView("reschedule")}>Reprogramar O/S</Button>}
           {editable && <Button variant="secondary" icon={view === "preview" ? Pencil : Eye} onClick={() => setView(view === "preview" ? "edit" : "preview")}>{view === "preview" ? "Editar" : "Vista previa"}</Button>}
           <Button variant="secondary" icon={ArrowLeft} onClick={() => router.push("/ordenes")}>Volver</Button>
           {view === "preview" && <Button variant="secondary" icon={Printer} onClick={() => window.print()}>Imprimir / Guardar PDF</Button>}
           {view === "edit" && <Button type="submit" form="service-order-edit-form" icon={FileText} loading={saving}>Guardar cambios</Button>}
           {canApprove && <Button variant="success" icon={CheckCircle2} onClick={() => setConfirmAction("Aprobada")}>Aprobar</Button>}
-          {order.status === "Aprobada" && !order.labor_review_required && <Button icon={Play} onClick={() => setConfirmAction("En Proceso")}>Iniciar servicio</Button>}
-          {["En Proceso", "Completada", "Cancelada"].includes(order.status) && <Button variant={order.status === "En Proceso" && canCloseServiceOrder(user?.role) ? "success" : "secondary"} icon={FileText} onClick={() => setView(view === "closure" ? "preview" : "closure")}>{view === "closure" ? "Vista previa" : order.status === "En Proceso" && canCloseServiceOrder(user?.role) ? "Cerrar O/S" : "Expediente de cierre"}</Button>}
+          {order.status === "Aprobada" && (order.order_kind !== "Garantia" || canManageWarranty(user?.role)) && !order.labor_review_required && view !== "reschedule" && <Button icon={Play} onClick={() => setConfirmAction("En Proceso")}>Iniciar servicio</Button>}
+          {/* Este acceso abre el expediente; el cierre se confirma al final de ServiceOrderClosure. */}
+          {["En Proceso", "Completada", "Cancelada"].includes(order.status) && <Button variant="primary" icon={FileText} onClick={() => setView(view === "closure" ? "preview" : "closure")}>{view === "closure" ? "Vista previa" : order.status === "En Proceso" && canManageClosure(user?.role) ? "Crear Expediente" : "Expediente de cierre"}</Button>}
           {canCancel && <Button variant="danger" icon={XCircle} onClick={() => setConfirmAction("Cancelada")}>Cancelar</Button>}
         </>}
       />
@@ -121,9 +127,10 @@ export default function OrdenDetallePage() {
       {order.labor_review_required && order.status !== "Cancelada" && view === "preview" && <Card className="print:hidden"><CardContent><p className="text-sm">Esta orden conserva horas anteriores pendientes de distribuir. Un Superadministrador, Administrador o Supervisor debe revisarlas para continuar.</p></CardContent></Card>}
 
       <FadeInUp className="print:hidden">
-        {view === "closure" ? <ServiceOrderClosure key={id} orderId={id} role={user?.role} onOrderChanged={async () => setOrder(await getOrderById(id))} onCompleted={async () => { setView("preview"); await load(); }} /> : view === "review" ? <LegacyLaborReview order={order} saving={saving} onSave={handleSave} onClose={() => setView("preview")} /> : view === "edit" ? <ServiceOrderForm formId="service-order-edit-form" defaultValues={buildServiceOrderDefaults(order)} context={order} lockPar loading={saving} onSubmit={handleSave} /> : <ServiceOrderPreview order={order} />}
+        {view === "reschedule" ? <ServiceOrderReschedule key={`${id}:${order.schedule_revision}`} order={order} onClose={() => setView("preview")} onSaved={(updated) => { setOrder(updated); setView("preview"); notify.success("O/S reprogramada. Requiere nueva aprobación."); }} /> : view === "closure" ? <ServiceOrderClosure key={id} orderId={id} role={user?.role} onOrderChanged={async () => setOrder(await getOrderById(id))} onCompleted={async () => { setView("preview"); await load(); }} /> : view === "review" ? <LegacyLaborReview order={order} saving={saving} onSave={handleSave} onClose={() => setView("preview")} /> : view === "edit" ? <ServiceOrderForm formId="service-order-edit-form" defaultValues={buildServiceOrderDefaults(order)} context={order} lockPar loading={saving} onSubmit={handleSave} /> : <ServiceOrderPreview order={order} />}
       </FadeInUp>
       {view === "preview" && <ServiceOrderPrintSheet order={order} />}
+      {view === "preview" && canApproveServiceOrder(user?.role) && <ServiceOrderScheduleHistory key={order.schedule_revision} orderId={id} />}
 
       <ConfirmDialog
         open={Boolean(confirmAction)}

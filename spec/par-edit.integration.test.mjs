@@ -112,7 +112,7 @@ try {
   const equipment = { itemNo: 1, isMain: true, equipmentId, observaciones: "Trabajo inicial" };
   const createPar = () => parRepo.create({ clientId, plantId, contactId, exchangeRate: 36.5, equipment: [equipment], items: [item] }, userId);
   const approve = (id) => parRepo.updateStatus(id, "Aprobado", { approvedBy: userId, approvedAt: "2026-10-21T12:00:00Z" });
-  const orderData = async (parId) => ({ parId, laborAllocations: [{ parItemId: (await parRepo.findById(parId)).items[0].id, technicalId, hours: 1 }], workType: "External", serviceType: "Maintenance", callDate: "2026-10-21", scheduledStart: "2026-10-22T10:00:00Z", scheduledEnd: "2026-10-22T11:00:00Z" });
+  const orderData = async (parId) => ({ parId, equipmentIds: [equipmentId], laborAllocations: [{ parItemId: (await parRepo.findById(parId)).items[0].id, technicalId, hours: 1 }], workType: "External", serviceType: "Maintenance", callDate: "2026-10-21", scheduledStart: "2026-10-22T10:00:00Z", scheduledEnd: "2026-10-22T11:00:00Z" });
   const parId = await createPar();
   await parRepo.update(parId, { items: [item] }, { role: ROLES.COORDINADOR });
   const approved = await approve(parId);
@@ -157,7 +157,9 @@ try {
   const order = await ordersRepo.create(await orderData(parId), userId);
   globalThis.__parTestSession = { user: { id: userId, role: ROLES.SUPER_ADMIN } };
   for (const status of ["Pendiente", "Aprobada", "En Proceso", "Completada"]) {
-    await pool.query("UPDATE service_order SET status = $1 WHERE id = $2", [status, order.id]);
+    // Fixture histórico: esta prueba verifica el bloqueo del PAR; el cierre con expediente
+    // se ejercita en sus integraciones específicas y exige metadatos adicionales.
+    await pool.query("UPDATE service_order SET status = $1, closure_legacy = $3 WHERE id = $2", [status, order.id, status === "Completada"]);
     for (const args of writes) {
       const response = await call(...args);
       assert.equal(response.status, 403, `${args[1]} con orden ${status}`);

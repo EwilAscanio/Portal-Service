@@ -6,14 +6,16 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { ReadonlyField } from "@/components/ui/ReadonlyField";
 import { formatDate } from "@/lib/format";
+import { TechnicalUnavailabilityPanel } from "./TechnicalUnavailabilityPanel";
 
 /** Modal de consulta del técnico (estructura espejo de TechnicalFormModal). */
-export function TechnicalViewModal({ tech, onClose, onEdit }) {
+export function TechnicalViewModal({ tech, onClose, onEdit, onUnavailabilityChanged }) {
   return (
     <Modal
       open={Boolean(tech)}
       onClose={onClose}
-      size="xl"
+      size="2xl"
+      scrollable
       title={tech?.name}
       description={tech ? `Cédula ${tech.cedula}` : undefined}
       footer={
@@ -28,7 +30,7 @@ export function TechnicalViewModal({ tech, onClose, onEdit }) {
       }
     >
       {tech && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <ReadonlyField label="Cédula">
             <span className="font-medium text-sm  text-foreground">
               {tech.cedula}
@@ -65,7 +67,7 @@ export function TechnicalViewModal({ tech, onClose, onEdit }) {
                 })
               : "—"}
           </ReadonlyField>
-        </div>
+        </div><TechnicalUnavailabilityPanel key={tech.id} technicalId={tech.id} onChanged={onUnavailabilityChanged} /></div>
       )}
     </Modal>
   );

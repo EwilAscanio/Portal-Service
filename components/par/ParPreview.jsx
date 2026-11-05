@@ -1,26 +1,28 @@
+import { parPurposeLabel } from "@/lib/warranty";
 import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PAR_STATUS_VARIANTS } from "@/lib/status";
 import { formatDate } from "@/lib/format";
 import { formatCurrencyUsd, formatCurrencyBs, formatNumber } from "@/utils/parCalc";
-import { calculateLineTotalUsd } from "@/utils/parCalc";
+import { cn } from "@/utils/cn";
 
-export function ParPreview({ par }) {
+export function ParPreview({ par, className }) {
   const items = par.items ?? [];
   const equipment = par.equipment ?? [];
-  const totalUsd = items.reduce((sum, item) => sum + Number(item.line_total_usd || 0), 0);
+  const totalUsd = Number(par.total_usd || 0);
   const totalBs = Number(par.total_bs || 0);
 
   return (
-    <Card className="mx-auto max-w-4xl overflow-hidden">
+    <Card className={cn("mx-auto w-full max-w-4xl overflow-hidden", className)}>
+      <p className="my-2 text-sm font-semibold">{parPurposeLabel(par.purpose)}{par.purpose === "ReferenciaGarantia" ? " · Sin importe comercial ni horas cotizadas" : ""}{Number(par.warranty_open_orders)>0 ? ` · ${par.warranty_open_orders} garantías abiertas` : ""}</p>
       {/* Encabezado del documento */}
-      <div className="border-b border-border bg-surface-2/50 px-8 py-6">
+      <div className="border-b border-border bg-surface-2/50 px-4 py-6 sm:px-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-muted">
               Maquitech · C.A.
             </p>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+            <h2 className="mt-1 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
               PLANILLA DE ATENCIÓN DE REQUISICIONES
             </h2>
             <p className="mt-1 text-sm text-muted">
@@ -39,15 +41,15 @@ export function ParPreview({ par }) {
         </div>
       </div>
 
-      <div className="space-y-6 px-8 py-6">
+      <div className="space-y-6 break-words px-4 py-6 sm:px-8">
         {/* Cliente */}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 [&>div]:min-w-0">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">Cliente</p>
             <p className="font-medium text-foreground">{par.client_name}</p>
             <p className="text-sm text-muted">{par.client_code}</p>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 min-[400px]:grid-cols-2 [&>div]:min-w-0">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">Contacto</p>
               <p className="text-sm text-foreground">{par.contact_name || "—"}</p>
@@ -70,59 +72,65 @@ export function ParPreview({ par }) {
           <p className="text-sm text-muted">{par.plant_address || ""}</p>
         </div>
 
-        {/* Equipos */}
-        {equipment.length > 0 && (
-          <div>
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted">
-              Equipos
-            </h3>
-            <div className="overflow-hidden rounded-xl border border-border">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-surface-2/60">
-                  <tr className="text-xs uppercase tracking-wider text-muted">
-                    <th className="px-4 py-2.5 font-semibold">N°</th>
-                    <th className="px-4 py-2.5 font-semibold">Tipo</th>
-                    <th className="px-4 py-2.5 font-semibold">Marca</th>
-                    <th className="px-4 py-2.5 font-semibold">Serial</th>
-                    <th className="px-4 py-2.5 font-semibold">Modelo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {equipment.map((eq, index) => (
-                    <tr key={eq.id ?? index} className="border-t border-border/60">
-                      <td className="px-4 py-2.5 text-muted">{eq.item_no ?? index + 1}</td>
-                      <td className="px-4 py-2.5 font-medium text-foreground">{eq.tipo || "—"}</td>
-                      <td className="px-4 py-2.5 text-foreground/90">{eq.marca || "—"}</td>
-                      <td className="px-4 py-2.5 text-foreground/90">{eq.serial || "—"}</td>
-                      <td className="px-4 py-2.5 text-foreground/90">{eq.modelo || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {equipment.some((eq) => eq.observaciones) && (
+        {/* El trabajo pertenece al snapshot de cada equipo (observaciones), no a la cabecera. */}
+        <section>
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted">
+            Equipos y trabajos a realizar
+          </h3>
+          <div className="space-y-4">
+            {equipment.map((eq, index) => (
+              <section key={eq.id ?? index} className="overflow-hidden rounded-xl border border-border">
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-surface-2/60 px-4 py-3">
+                  <h4 className="min-w-0 text-sm font-semibold text-foreground">
+                    Equipo N° {eq.item_no ?? index + 1} · {eq.tipo || "Tipo no registrado"}
+                  </h4>
+                  {eq.is_main && (
+                    <span className="rounded-md bg-blue-500/10 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+                      Principal
+                    </span>
+                  )}
+                </div>
+                <dl className="grid gap-3 px-4 py-3 text-sm sm:grid-cols-3 [&>div]:min-w-0">
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wider text-muted">Marca</dt>
+                    <dd className="mt-1 text-foreground">{eq.marca || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wider text-muted">Serial</dt>
+                    <dd className="mt-1 text-foreground">{eq.serial || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wider text-muted">Modelo</dt>
+                    <dd className="mt-1 text-foreground">{eq.modelo || "—"}</dd>
+                  </div>
+                </dl>
                 <div className="border-t border-border bg-surface-2/30 px-4 py-3">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-                    Descripción del trabajo a realizar
+                    Trabajo a realizar
                   </p>
-                  {equipment
-                    .filter((eq) => eq.observaciones)
-                    .map((eq, index) => (
-                      <p key={index} className="mt-1 text-sm text-foreground/90">
-                        {eq.observaciones}
-                      </p>
-                    ))}
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-foreground/90">
+                    {eq.observaciones?.trim() ? eq.observaciones : "Sin trabajo a realizar registrado."}
+                  </p>
                 </div>
-              )}
-            </div>
+              </section>
+            ))}
+            {equipment.length === 0 && (
+              <p className="text-sm text-muted">Sin equipos registrados.</p>
+            )}
           </div>
-        )}
+        </section>
 
         {/* Ítems */}
         <div>
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted">
             Productos adicionales y mano de obra
           </h3>
-          <div className="overflow-x-auto rounded-xl border border-border">
+          <div
+            role="region"
+            aria-label="Productos adicionales y mano de obra"
+            tabIndex={0}
+            className="overflow-x-auto rounded-xl border border-border"
+          >
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="bg-surface-2/60">
                 <tr className="text-xs uppercase tracking-wider text-muted">
@@ -178,13 +186,21 @@ export function ParPreview({ par }) {
           <div className="mb-3 rounded border border-current/20 p-3 text-sm"><strong>Total de horas presupuestadas: {Number(par.budgeted_hours || 0).toFixed(2)} h</strong><p className="text-xs">Suma de cantidades de mano de obra; horas compartidas entre técnicos.</p></div>
         <div className="flex flex-wrap justify-end gap-4">
           <div className="min-w-40 rounded-xl border border-border bg-surface-2/50 px-5 py-3 text-right">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Total USD</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Subtotal USD</p>
+            <p className="text-xl font-bold">{formatCurrencyUsd(par.subtotal_usd)}</p>
+          </div>
+          <div className="min-w-40 rounded-xl border border-border bg-surface-2/50 px-5 py-3 text-right">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Descuento ({formatNumber(par.discount_percent)} %)</p>
+            <p className="text-xl font-bold">− {formatCurrencyUsd(par.discount_amount_usd)}</p>
+          </div>
+          <div className="min-w-40 rounded-xl border border-border bg-surface-2/50 px-5 py-3 text-right">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Total final USD</p>
             <p className="text-xl font-bold text-blue-600 dark:text-blue-400">
               {formatCurrencyUsd(totalUsd)}
             </p>
           </div>
           <div className="min-w-40 rounded-xl border border-border bg-surface-2/50 px-5 py-3 text-right">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Total Bs.</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Total final Bs.</p>
             <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
               {formatCurrencyBs(totalBs)}
             </p>
@@ -194,7 +210,7 @@ export function ParPreview({ par }) {
         {/* Firmas */}
         <div className="mt-8 grid gap-8 sm:grid-cols-2">
           <div>
-            <p className="text-sm font-medium text-foreground">{par.elaborado_por || "—"}</p>
+            <p className="text-sm font-medium text-foreground">{par.elaborado_por || par.created_by_name || "—"}</p>
             <div className="mt-1 border-t-2 border-dashed border-border pt-1">
               <p className="text-xs uppercase tracking-wider text-muted">Elaborado por</p>
             </div>

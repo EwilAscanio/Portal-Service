@@ -30,8 +30,9 @@
 !AI_CONTEXT.md
 !APP_DEPENDENCIES.md
 !README.md
-!docs/cierre-orden-servicio.md
-!docs/reportes.md
+!/AGENTS.md
+!db/MIGRATIONS.md
+!docs/**/*.md
 
 # debug
 npm-debug.log*
@@ -45,6 +46,12 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# otros
+.cursor
+.archify
+.kilo
+.cursorrules
 
 # typescript
 *.tsbuildinfo

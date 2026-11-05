@@ -67,6 +67,7 @@ try {
   const technical2 = (await client.query("INSERT INTO technical(cedula,name) VALUES ('V-IT-2','Técnico Dos') RETURNING id")).rows[0].id;
   const technical3 = (await client.query("INSERT INTO technical(cedula,name) VALUES ('V-IT-3','Técnico Tres') RETURNING id")).rows[0].id;
   const technical4 = (await client.query("INSERT INTO technical(cedula,name) VALUES ('V-IT-4','Técnico Cuatro') RETURNING id")).rows[0].id;
+  const technical5 = (await client.query("INSERT INTO technical(cedula,name) VALUES ('V-IT-5','Técnico Cinco') RETURNING id")).rows[0].id;
   const roleId = (await client.query("SELECT id FROM role WHERE name='Administrador'")).rows[0].id;
   const userId = (await client.query("INSERT INTO users(login,name,email,password_hash,role_id) VALUES ('integration','Integration User','integration@test.dev','hash',$1) RETURNING id", [roleId])).rows[0].id;
   const parId = (await client.query("INSERT INTO par_header(par_number,client_id,plant_id,contact_id,status,exchange_rate,observations,created_by) VALUES ('PAR-IT-1',$1,$2,$3,'Aprobado',1,'Trabajo de integración',$4) RETURNING id", [client1, plant1, contact1, userId])).rows[0].id;
@@ -76,7 +77,9 @@ try {
   const orderId = (await client.query(insertOrder, ["OS-IT-1", client1, plant1, equipment1, technical, contact1, parId, userId])).rows[0].id;
   await client.query("INSERT INTO service_order_technician(service_order_id,technical_id,is_lead) VALUES ($1,$2,true)", [orderId, technical]);
   await client.query("INSERT INTO service_order_technician(service_order_id,technical_id) VALUES ($1,$2),($1,$3)", [orderId, technical2, technical3]);
-  await expectCheck(() => client.query("INSERT INTO service_order_technician(service_order_id,technical_id) VALUES ($1,$2)", [orderId, technical4]));
+  await client.query("INSERT INTO service_order_technician(service_order_id,technical_id) VALUES ($1,$2)", [orderId, technical4]);
+  assert.equal((await client.query("SELECT count(*)::int AS total FROM service_order_technician WHERE service_order_id=$1", [orderId])).rows[0].total, 4);
+  await expectCheck(() => client.query("INSERT INTO service_order_technician(service_order_id,technical_id) VALUES ($1,$2)", [orderId, technical5]));
   await client.query("UPDATE service_order SET amount=25,status='En Proceso' WHERE id=$1", [orderId]);
   const normalized = (await client.query("SELECT so.amount,so.status,c.description,p.name,e.name,ct.name FROM service_order so JOIN client c ON c.id=so.client_id JOIN plant p ON p.id=so.plant_id JOIN equipment e ON e.id=so.equipment_id JOIN contact ct ON ct.id=so.contact_id WHERE so.id=$1", [orderId])).rows[0];
   assert.equal(normalized.amount, "25.00");

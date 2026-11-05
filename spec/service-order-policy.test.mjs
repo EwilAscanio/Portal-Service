@@ -5,6 +5,7 @@ import {
   canEditServiceOrder,
   canUpdateWorkedHours,
   isValidServiceOrderTransition,
+  MAX_SERVICE_ORDER_TECHNICIANS,
 } from "../lib/service-order-policy.js";
 import { ROLES } from "../lib/permissions.js";
 
@@ -14,6 +15,7 @@ assert.equal(canApproveServiceOrder(ROLES.SUPERVISOR), true);
 assert.equal(canApproveServiceOrder(ROLES.COORDINADOR), false);
 assert.equal(canApproveServiceOrder(ROLES.TECNICO), false);
 assert.equal(canEditServiceOrder("Pendiente"), true);
+assert.equal(MAX_SERVICE_ORDER_TECHNICIANS, 4);
 assert.equal(canEditServiceOrder("Aprobada"), false);
 assert.equal(canUpdateWorkedHours("En Proceso"), false);
 assert.equal(canUpdateWorkedHours("Aprobada"), false);
@@ -47,7 +49,7 @@ assert.match(parSearch, /par_number/);
 assert.match(parSearch, /client_name/);
 assert.match(parSearch, /plant_name/);
 assert.match(technicianSelector, /Marcar principal/);
-assert.match(technicianSelector, /3 seleccionados/);
+assert.match(technicianSelector, /de \{MAX_SERVICE_ORDER_TECHNICIANS\} seleccionados/);
 assert.match(technicianSelector, /status === "Activo"/);
 assert.match(catalogsRoute, /c\.codclie AS client_code/);
 assert.doesNotMatch(orderForm, /onChange=\{setField\("orderCode"\)\}/);

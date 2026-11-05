@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertCircle, Briefcase, Mail, Pencil, Phone, Plus, Trash2, User } from "lucide-react";
+import { AlertCircle, Briefcase, Eye, Mail, Pencil, Phone, Plus, Trash2, User } from "lucide-react";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -24,6 +24,7 @@ import { FadeInUp } from "@/components/ui/animated";
 import { DataTable } from "@/components/tables/DataTable";
 import { RowActions } from "@/components/tables/RowActions";
 import { ContactCardGrid } from "@/components/catalog/ContactCardGrid";
+import { ContactConsultationModal } from "@/components/catalog/ContactConsultationModal";
 
 const EMPTY_FORM = { name: "", department: "", clientId: "", plantId: "", phone: "", email: "" };
 
@@ -51,6 +52,7 @@ export default function ContactosPage() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [serverError, setServerError] = useState("");
   const [confirm, setConfirm] = useState(null);
+  const [viewContact, setViewContact] = useState(null);
 
   const [view, setView, viewHydrated] = useLocalStorage("mq-contactos-view", "table");
   const effectiveView = viewHydrated ? view : "table";
@@ -83,6 +85,7 @@ export default function ContactosPage() {
   const availablePlants = useMemo(() => plants.filter((plant) => plant.client_id === form.clientId), [plants, form.clientId]);
 
   const openForm = (contact = null) => {
+    setViewContact(null);
     setEditing(contact);
     setForm(contact ? { name: contact.name || "", department: contact.department || "", clientId: contact.client_id || "", plantId: contact.plant_id || "", phone: contact.phone || "", email: contact.email || "" } : EMPTY_FORM);
     setFieldErrors({});
@@ -125,7 +128,24 @@ export default function ContactosPage() {
     { key: "department", header: "Departamento", className: "hidden lg:table-cell", render: (row) => row.department || "—" },
     { key: "phone", header: "Teléfono", className: "hidden md:table-cell", render: (row) => row.phone || "—" },
     { key: "email", header: "Email", className: "hidden lg:table-cell", render: (row) => row.email || "—" },
-    { key: "actions", header: "", sortable: false, className: "w-12", render: (row) => <RowActions row={row} actions={[{ label: "Editar", icon: Pencil, onClick: openForm }, { label: "Eliminar", icon: Trash2, danger: true, onClick: setConfirm }]} /> },
+    {
+      key: "actions", header: "", sortable: false, className: "w-12",
+      render: (row) => (
+        <div
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            // Aislar la activación del menú del clic/teclado de la fila; Escape sigue cerrándolo.
+            if (event.key === "Enter" || event.key === " ") event.stopPropagation();
+          }}
+        >
+          <RowActions row={row} actions={[
+            { label: "Ver contacto", icon: Eye, onClick: setViewContact },
+            { label: "Editar", icon: Pencil, onClick: openForm },
+            { label: "Eliminar", icon: Trash2, danger: true, onClick: setConfirm },
+          ]} />
+        </div>
+      ),
+    },
   ];
 
   return <div className="space-y-6">
@@ -133,28 +153,36 @@ export default function ContactosPage() {
     <FadeInUp>
       <Card>
         <CardContent>
-          <div className="mb-4 flex flex-nowrap items-center justify-between gap-3">
-            <SearchInput value={query} onChange={setQuery} placeholder="Buscar por nombre, cliente, planta, teléfono o email…" className="w-56 shrink-0" />
-            <div className="w-56 shrink-0">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <SearchInput value={query} onChange={setQuery} placeholder="Buscar por nombre, cliente, planta, teléfono o email…" className="w-full sm:w-56 sm:shrink-0" />
+            <div className="w-full sm:w-56 sm:shrink-0">
               <ClientSearch clients={clients} value={clientFilter === "Todos" ? "" : clientFilter} onChange={(id) => setClientFilter(id || "Todos")} label="" placeholder="Buscar Cliente…" />
             </div>
             <Badge variant="info" className="shrink-0 text-xs">{filtered.length} contactos</Badge>
             <ViewToggle view={effectiveView} onChange={setView} />
           </div>
           {effectiveView === "table" ? (
-            <DataTable columns={columns} data={filtered} loading={loading} searchable={false} emptyTitle="No hay contactos registrados" emptyDescription="Ajusta la búsqueda o cambia el filtro de cliente." />
+            <DataTable columns={columns} data={filtered} loading={loading} searchable={false} onRowClick={setViewContact} emptyTitle="No hay contactos registrados" emptyDescription="Ajusta la búsqueda o cambia el filtro de cliente." />
           ) : (
-            <ContactCardGrid contacts={filtered} loading={loading} onEdit={openForm} onDelete={setConfirm} />
+            <ContactCardGrid contacts={filtered} loading={loading} onView={setViewContact} onEdit={openForm} onDelete={setConfirm} />
           )}
         </CardContent>
       </Card>
     </FadeInUp>
+    {viewContact && (
+      <ContactConsultationModal
+        contact={viewContact}
+        onClose={() => setViewContact(null)}
+        onEdit={openForm}
+      />
+    )}
     <Modal
       open={modalOpen}
       onClose={() => setModalOpen(false)}
       title={editing ? "Editar contacto" : "Nuevo contacto"}
       description={editing ? "Modifica los datos del contacto." : "Completa los campos para registrar un nuevo contacto."}
-      size="lg"
+      size="xl"
+      scrollable
       footer={<><Button variant="secondary" onClick={() => setModalOpen(false)} disabled={saving}>Cancelar</Button><Button form="contact-form" type="submit" loading={saving}>{editing ? "Guardar cambios" : "Crear contacto"}</Button></>}
     >
       <form id="contact-form" className="space-y-4" onSubmit={handleSubmit} noValidate>
@@ -167,8 +195,8 @@ export default function ContactosPage() {
         <Input label="Nombre y Apellido *" icon={User} placeholder="Nombre y apellido" autoFocus value={form.name} error={fieldErrors.name} onChange={(event) => setField("name", event.target.value)} />
         <ClientSearch clients={editing ? clients : clients.filter((client) => client.status === "1")} value={form.clientId} error={fieldErrors.clientId} onChange={handleClientChange} />
         <Select label="Planta *" value={form.plantId} disabled={!form.clientId} error={fieldErrors.plantId} onChange={(event) => setField("plantId", event.target.value)} options={[{ value: "", label: form.clientId ? "Seleccione una planta" : "Seleccione primero un cliente" }, ...availablePlants.map((plant) => ({ value: plant.id, label: plant.name }))]} />
-        <Input label="Departamento" icon={Briefcase} placeholder="Área o departamento" value={form.department} error={fieldErrors.department} onChange={(event) => setField("department", event.target.value)} />
-        <div className="grid gap-4 sm:grid-cols-2"><Input label="Teléfono" icon={Phone} placeholder="+57 300 000 0000" value={form.phone} onChange={(event) => setField("phone", event.target.value)} /><Input label="Email" type="email" icon={Mail} placeholder="correo@empresa.com" value={form.email} error={fieldErrors.email} onChange={(event) => setField("email", event.target.value)} /></div>
+        <div className="grid gap-4 sm:grid-cols-2"><Input label="Departamento" icon={Briefcase} placeholder="Área o departamento" value={form.department} error={fieldErrors.department} onChange={(event) => setField("department", event.target.value)} /><Input label="Teléfono" icon={Phone} placeholder="+57 300 000 0000" value={form.phone} onChange={(event) => setField("phone", event.target.value)} /></div>
+        <Input label="Email" type="email" icon={Mail} placeholder="correo@empresa.com" value={form.email} error={fieldErrors.email} onChange={(event) => setField("email", event.target.value)} />
       </form>
     </Modal>
     <ConfirmDialog open={Boolean(confirm)} onClose={() => setConfirm(null)} title="Eliminar contacto" description="No se podrá eliminar si está asociado a una orden." onConfirm={async () => { try { await deleteContact(confirm.id); setConfirm(null); notify.success("Contacto eliminado."); await loadData(); } catch (err) { notify.error(getPublicError(err)); } }} />

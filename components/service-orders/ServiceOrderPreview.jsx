@@ -1,3 +1,4 @@
+import { WarrantySummary } from "@/components/service-orders/WarrantySummary";
 import { LaborAllocationSummary } from "@/components/service-orders/LaborAllocationSummary";
 import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -27,11 +28,12 @@ export function ServiceOrderPreview({ order }) {
       </div>
 
       <div className="space-y-6 px-8 py-6">
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <WarrantySummary order={order} />
+        <section className={`grid gap-4 sm:grid-cols-2 ${order.order_kind === "Garantia" ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}>
           <Info label="Cliente" value={order.client_name} detail={order.client_code} />
           <Info label="Planta" value={order.plant_name} detail={order.plant_address} />
           <Info label="Contacto" value={order.contact_name} detail={order.contact_phone || order.contact_email} />
-          <Info label="Referencias" value={`OC: ${order.purchase_order_number || "—"}`} detail={`Cotización: ${order.quotation_number || "—"}`} />
+          {order.order_kind !== "Garantia" && <Info label="Referencias" value={`OC: ${order.purchase_order_number || "—"}`} detail={`Cotización: ${order.quotation_number || "—"}`} />}
         </section>
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

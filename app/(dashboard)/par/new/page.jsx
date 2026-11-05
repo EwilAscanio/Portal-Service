@@ -18,6 +18,7 @@ function buildEmptyForm() {
     contactId: "",
     fechaEmision: new Date().toISOString().split("T")[0],
     exchangeRate: "0",
+    discountPercent: "0",
     observations: "",
     elaboradoPor: "",
     equipment: [

@@ -20,6 +20,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { Stagger, FadeInUp } from "@/components/ui/animated";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/utils/cn";
+import { TechnicalAvailability } from "./TechnicalAvailability";
 
 const PAGE_SIZE = 12;
 
@@ -141,6 +142,7 @@ export function TechnicalCardGrid({
                 <p className="line-clamp-2 text-sm font-medium text-foreground">
                   {technician.name}
                 </p>
+                <div><TechnicalAvailability unavailability={technician.unavailability} /></div>
 
                 {/* Detalles */}
                 <div className="space-y-1.5 border-y border-border py-2 text-xs">

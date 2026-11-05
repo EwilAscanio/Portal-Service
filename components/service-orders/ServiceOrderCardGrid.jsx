@@ -1,5 +1,6 @@
 "use client";
 
+import { orderKindLabel } from "@/lib/warranty";
 import { useState } from "react";
 import { Building2, CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Clock3, Factory, Inbox, Users } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/Card";
@@ -44,7 +45,7 @@ export function ServiceOrderCardGrid({ orders, loading, onNavigate }) {
         <Card className="flex h-full cursor-pointer flex-col transition-colors hover:border-blue-500/40" onClick={() => onNavigate(row)} onKeyDown={(event) => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); onNavigate(row); } }} role="button" tabIndex={0} aria-label={`Abrir orden ${row.order_code}`}>
           <CardContent className="flex flex-1 flex-col gap-2 p-4">
             <div className="flex items-start justify-between gap-2"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600"><ClipboardList className="h-4 w-4" /></span><StatusBadge status={row.status} variants={ORDER_STATUS_VARIANTS} /></div>
-            <div><p className="truncate text-sm font-semibold text-foreground">{row.order_code}</p><p className="text-xs text-muted">PAR {row.par_number || "—"}</p></div>
+            <div><p className="truncate text-sm font-semibold text-foreground">{row.order_code} · {orderKindLabel(row.order_kind)}</p><p className="text-xs text-muted">PAR {row.par_number || "—"}</p></div>
             <div className="space-y-1.5 border-y border-border py-2 text-xs">
               <Line icon={Building2} label="Cliente" value={row.client_name} />
               <Line icon={Factory} label="Planta" value={row.plant_name} />

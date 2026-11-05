@@ -30,6 +30,7 @@ import { getParById, updatePar, updateParStatus, deletePar } from "@/lib/api";
 
 function toFormDefaults(par) {
   return {
+    purpose: par.purpose || "Comercial",
     clientId: par.client_id || "",
     plantId: par.plant_id || "",
     contactId: par.contact_id || "",
@@ -37,6 +38,7 @@ function toFormDefaults(par) {
       ? String(par.fecha_emision).slice(0, 10)
       : new Date().toISOString().split("T")[0],
     exchangeRate: par.exchange_rate?.toString() ?? "0",
+    discountPercent: par.discount_percent?.toString() ?? "0",
     observations: par.observations || "",
     elaboradoPor: par.elaborado_por || "",
     equipment: (par.equipment ?? []).map((eq) => ({
@@ -106,11 +108,11 @@ export default function ParDetailPage() {
     if (!canEditItems) return;
     try {
       setSaving(true);
-      const updated = await updatePar(id, { items: payload.items });
+      const updated = await updatePar(id, { items: payload.items, discountPercent: payload.discountPercent });
       setPar(updated);
       setView("preview");
-      notify.success("Ítems actualizados", {
-        description: `Los ítems de ${updated.par_number} fueron guardados.`,
+      notify.success("PAR actualizado", {
+        description: `Los ítems y el descuento de ${updated.par_number} fueron guardados.`,
       });
     } catch (err) {
       notify.error("Error al guardar", {
@@ -201,7 +203,7 @@ export default function ParDetailPage() {
                 icon={editingItems ? Eye : Pencil}
                 onClick={() => setView(editingItems ? "preview" : "items")}
               >
-                {editingItems ? "Vista previa" : "Editar ítems"}
+                {editingItems ? "Vista previa" : "Editar ítems y descuento"}
               </Button>
             )}
             <Button variant="secondary" icon={ArrowLeft} onClick={() => router.push("/par")}>
@@ -219,7 +221,7 @@ export default function ParDetailPage() {
                 icon={FileText}
                 loading={saving}
               >
-                Guardar ítems
+                Guardar cambios
               </Button>
             )}
             {status === "Creado" && (
@@ -257,7 +259,7 @@ export default function ParDetailPage() {
             defaultValues={toFormDefaults(par)}
             onSubmit={handleSave}
             loading={saving}
-            submitLabel="Guardar ítems"
+            submitLabel="Guardar cambios"
           />
         ) : (
           <ParPreview par={par} />

@@ -18,6 +18,8 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { useAuth } from "@/hooks/useAuth";
 import { notify } from "@/lib/toast";
 import { getDashboard } from "@/lib/api";
+import { canReadPending } from "@/lib/service-pending";
+import { PendingDashboardCard } from "@/components/dashboard/PendingDashboardCard";
 import { Button } from "@/components/ui/Button";
 import {
   Card,
@@ -109,12 +111,14 @@ export default function DashboardPage() {
   const now = useSyncExternalStore(EMPTY_SUBSCRIBE, getClientNow, () => null);
 
   const [stats, setStats] = useState(null);
+  const [dashboardError,setDashboardError]=useState(false);
 
   useEffect(() => {
     async function fetchStats() {
       try {
         setStats(await getDashboard());
       } catch {
+        setDashboardError(true);
         // Silenciar error, mostrar zeros
       }
     }
@@ -244,6 +248,8 @@ export default function DashboardPage() {
           </ChartCard>
         </FadeInUp>
       </Stagger>
+
+      {canReadPending(user?.role) && <PendingDashboardCard summary={stats?.pendingSummary} loading={!stats && !dashboardError} error={dashboardError} />}
 
       {/* Tabla + widgets laterales */}
       <Stagger className="grid grid-cols-1 gap-6 xl:grid-cols-3">

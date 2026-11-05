@@ -56,7 +56,7 @@ export async function PUT(request, { params }) {
       );
     }
 
-    await parRepo.update(Number(id), { items: parsed.data.items }, { role: session.user.role });
+    await parRepo.update(Number(id), parsed.data, { role: session.user.role });
     const updated = await parRepo.findById(Number(id));
     return NextResponse.json(updated);
   } catch (error) {

@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { auth } from "@/auth";
+import { pendingSummary } from "@/lib/repositories/service-pending.repository";
 
 export async function GET() {
   try {
+    const session=await auth();
+    if(!session?.user?.id || session.user.status!=="Activo") return NextResponse.json({error:"No autenticado."},{status:401});
+    const pending=await pendingSummary({userId:session.user.id,role:session.user.role});
     const ordersStats = await query(`
       SELECT
         COUNT(*)::int AS total,
@@ -71,6 +76,7 @@ export async function GET() {
         { name: "Canceladas", value: os.cancelled, color: "#ef4444" },
       ],
       recentOrders: recentOrders.rows,
+      pendingSummary: pending,
     });
   } catch (error) {
     console.error("Error al obtener stats del dashboard:", error);

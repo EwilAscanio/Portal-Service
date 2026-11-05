@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, RefreshCw, Save, Upload } from "lucide-react";
-import { getOrderClosure, updateOrderClosure, uploadOrderClosureFile, retireOrderClosureFile } from "@/lib/api";
+import { getOrderClosure, updateOrderClosure, uploadOrderClosureFile, retireOrderClosureFile, uploadOrderPhoto, retireOrderPhoto } from "@/lib/api";
+import { MAX_ORDER_PHOTOS } from "@/lib/service-pending";
+import { ServiceOrderFieldWork } from "./ServiceOrderFieldWork";
 import { CLOSURE_DOCUMENTS, MAX_CLOSURE_FILE_SIZE, canManageClosure, canCloseServiceOrder, requirementStatus } from "@/lib/service-order-closure";
 import { hourUnits } from "@/lib/labor-hours";
 import { getPublicError } from "@/lib/ui-errors";
@@ -15,6 +17,8 @@ import { ConfirmDialog, Modal } from "@/components/ui/Modal";
 const hours = (value) => Number(value || 0).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const date = (value) => value ? new Date(value).toLocaleString("es-VE") : "—";
 const actionLabels = { equipment: "Equipos confirmados", hours: "Horas reales guardadas", requirement: "Requisito actualizado", upload_file: "Archivo adjunto", replace_file: "Archivo reemplazado", retire_file: "Archivo retirado", close: "O/S cerrada" };
+Object.assign(actionLabels,{pendings:"Pendientes guardados",upload_photo:"Foto adjunta",replace_photo:"Foto reemplazada",retire_photo:"Foto retirada"});
+const pendingDraftFrom=(snapshot)=>(snapshot.fieldWork?.pendingItems || []).map(({id,description})=>({id,description}));
 
 function closureMessage(error) {
   const payload = error?.response?.data;
@@ -30,6 +34,8 @@ export function ServiceOrderClosure({ orderId, role, onCompleted, onOrderChanged
   const [snapshot, setSnapshot] = useState(null);
   const [draft, setDraft] = useState({ actuals: [], notes: "", excessReason: "" });
   const [dirty, setDirty] = useState(false);
+  const [pendingDraft,setPendingDraft]=useState([]);
+  const [pendingDirty,setPendingDirty]=useState(false);
   const [equipmentIds, setEquipmentIds] = useState([]);
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
@@ -45,6 +51,7 @@ export function ServiceOrderClosure({ orderId, role, onCompleted, onOrderChanged
     try {
       const data = await getOrderClosure(orderId);
       setSnapshot(data); setDraft(draftFrom(data)); setDirty(false); setEquipmentIds([]);
+      setPendingDraft(pendingDraftFrom(data));setPendingDirty(false);
     } catch (failure) { setError(closureMessage(failure)); }
     finally { setBusy(false); }
   }, [orderId]);
@@ -87,6 +94,27 @@ export function ServiceOrderClosure({ orderId, role, onCompleted, onOrderChanged
     });
   };
 
+  const uploadPhotos=async(files,replaceId)=>{
+    if(!files.length) return;
+    const active=snapshot.fieldWork.photos.filter((photo)=>!photo.retired_at).length;
+    if(active+files.length-(replaceId ? 1 : 0)>MAX_ORDER_PHOTOS || (replaceId && files.length!==1)) { setError("Seleccione hasta completar cinco fotos por O/S.");return; }
+    if(files.some((file)=>!file.size || file.size>MAX_CLOSURE_FILE_SIZE || !/\.(jpe?g|png)$/i.test(file.name))) { setError("Seleccione fotos JPG o PNG no vacías de hasta 10 MB.");return; }
+    await run(async()=>{
+      let next=snapshot;
+      for(const file of files) {
+        const form=new FormData();form.set("revision",String(next.order.closure_revision));form.set("file",file);
+        if(replaceId) form.set("replaceId",replaceId);
+        next=await uploadOrderPhoto(orderId,form);setSnapshot(next);
+      }
+      return next;
+    });
+  };
+  const savePendings=async()=>{
+    if(pendingDraft.some((row)=>!row.description.trim())) { setError("Escriba el pendiente o retire las líneas vacías.");return; }
+    const next=await action({action:"pendings",items:pendingDraft});
+    if(next) { setPendingDraft(pendingDraftFrom(next));setPendingDirty(false);notify.success("Pendientes guardados como borrador."); }
+  };
+
   if (!snapshot) return <Card><CardContent className="space-y-3"><p role={error ? "alert" : "status"}>{error || "Cargando expediente de cierre…"}</p>{error && <Button onClick={load} disabled={busy}>Reintentar</Button>}</CardContent></Card>;
 
   const { order, requirements, allocations, equipment, budget } = snapshot;
@@ -108,7 +136,11 @@ export function ServiceOrderClosure({ orderId, role, onCompleted, onOrderChanged
     }
   }
   if (actualUnits > 99999999) invalidHours = true;
-  for (const [itemId, units] of actualByItem) if (units > hourUnits(budget.items.find((item) => item.id === itemId)?.available_hours ?? 0)) exceeded = true;
+  if (order.order_kind !== "Garantia") {
+    for (const [itemId, units] of actualByItem) {
+      if (units > hourUnits(budget.items.find((item) => item.id === itemId)?.available_hours ?? 0)) exceeded = true;
+    }
+  }
   const resolved = requirements.filter((item) => requirementStatus(item) !== "Pendiente").length;
   const expected = equipment.length * CLOSURE_DOCUMENTS.length;
   const missing = [];
@@ -118,6 +150,7 @@ export function ServiceOrderClosure({ orderId, role, onCompleted, onOrderChanged
   if (invalidHours) missing.push("Completar las horas reales y explicar las asignaciones con cero horas.");
   if (exceeded && draft.excessReason.trim().length < 5) missing.push("Justificar el exceso de horas.");
   if (dirty) missing.push("Guardar las horas y observaciones antes de cerrar.");
+  if (pendingDirty) missing.push("Guardar la lista de pendientes antes de cerrar.");
 
   const saveHours = async () => {
     if (invalidHours) { setError("Complete las horas reales, con hasta dos decimales, y explique las asignaciones con cero horas."); return; }
@@ -126,10 +159,10 @@ export function ServiceOrderClosure({ orderId, role, onCompleted, onOrderChanged
   };
 
   return <div className="space-y-5">
-    <Card><CardHeader><CardTitle>Expediente de cierre · {order.order_code}</CardTitle><Button variant="ghost" icon={RefreshCw} disabled={busy} onClick={() => dirty ? setConfirmReload(true) : load()}>Actualizar</Button></CardHeader><CardContent className="space-y-3">
+    <Card><CardHeader><CardTitle>Expediente de cierre · {order.order_code}</CardTitle><Button variant="ghost" icon={RefreshCw} disabled={busy} onClick={() => dirty || pendingDirty ? setConfirmReload(true) : load()}>Actualizar</Button></CardHeader><CardContent className="space-y-3">
       {error && <p role="alert" className="rounded-xl bg-red-500/10 p-3 text-sm text-red-500">{error}</p>}
       {order.closure_legacy ? <p className="text-sm">Orden completada antes del control de cierre. Sus horas anteriores se conservan; no se consideran horas reales confirmadas.</p> : <p className="text-sm">Documentos resueltos: <strong>{resolved} de {expected}</strong>. Estimadas: <strong>{hours(order.worked_hours)} h</strong>. {order.closed_at ? <>Reales confirmadas: <strong>{hours(order.actual_hours)} h</strong>. Cierre por {order.closed_by_name} · {date(order.closed_at)}.</> : "Las horas reales se confirmarán al cerrar la O/S."}</p>}
-      {order.status === "Cancelada" && <p className="text-sm">Orden cancelada: sus horas están liberadas. Los documentos y reportes registrados permanecen en el historial.</p>}
+      {order.status === "Cancelada" && <p className="text-sm">Orden cancelada. Las horas normales dejan de reservar saldo; las de garantía no afectan el presupuesto comercial. Se conserva el historial.</p>}
       {order.status !== "En Proceso" && !order.closure_legacy && <p className="text-sm text-muted">El expediente está en consulta. La carga se habilita durante En Proceso.</p>}
     </CardContent></Card>
 
@@ -148,6 +181,10 @@ export function ServiceOrderClosure({ orderId, role, onCompleted, onOrderChanged
       })}
     </CardContent></Card>)}
 
+    {!order.closure_legacy && <ServiceOrderFieldWork orderId={orderId} fieldWork={snapshot.fieldWork} items={pendingDraft} dirty={pendingDirty} busy={busy}
+      onChange={(items)=>{setPendingDraft(items);setPendingDirty(true);}} onSave={savePendings} onUpload={uploadPhotos}
+      onRetire={(photo)=>{setRetiring({...photo,photo:true});setRetirementReason("");}} />}
+
     {!order.closure_legacy && <Card><CardHeader><CardTitle>Horas reales del servicio</CardTitle></CardHeader><CardContent className="space-y-4">
       <p className="text-sm text-muted">Registre lo reportado por cada técnico programado. Las horas estimadas se conservan. Si no participó, indique 0 y explique el motivo.</p>
       {order.labor_review_required ? <p role="alert" className="text-sm text-amber-600">Revise primero las horas anteriores desde la vista previa de la orden.</p> : <>
@@ -158,27 +195,28 @@ export function ServiceOrderClosure({ orderId, role, onCompleted, onOrderChanged
         })}</tbody></table></div>
         {!allocations.length && <p className="text-sm">Esta orden no tiene horas presupuestadas distribuidas. Se conserva la explicación de la revisión anterior.</p>}
         <p className="font-semibold">Total real {order.closed_at ? "confirmado" : "reportado"}: {hours(actualUnits / 100)} h</p>
-        <div className="rounded-xl border border-border p-3 text-sm"><p className="mb-2 font-semibold">Saldo del PAR después de este cierre, por renglón</p>{budget.items.map((item) => {
+        {order.order_kind === "Garantia" ? <p className="rounded-xl border border-border p-3 text-sm">Estas horas corresponden a garantía y no modifican el saldo comercial del PAR. El exceso se compara con la estimación de esta O/S.</p> : <div className="rounded-xl border border-border p-3 text-sm"><p className="mb-2 font-semibold">Saldo del PAR después de este cierre, por renglón</p>{budget.items.map((item) => {
           const remaining = (hourUnits(item.available_hours) - (actualByItem.get(item.id) || 0)) / 100;
           return <p key={item.id}>{item.item_no}. {item.description}: {remaining < 0 ? <span className="text-amber-600">Exceso de {hours(-remaining)} h · 0 h disponibles</span> : <span>{hours(remaining)} h disponibles</span>}</p>;
-        })}{!!budget.pendingReviewOrders.length && <p className="mt-2 text-amber-600">Saldo provisional: existen otras órdenes con horas anteriores por revisar.</p>}{invalidHours && <p className="mt-2 text-muted">La proyección estará completa al ingresar todas las horas reales.</p>}</div>
+        })}{!!budget.pendingReviewOrders.length && <p className="mt-2 text-amber-600">Saldo provisional: existen otras órdenes con horas anteriores por revisar.</p>}{invalidHours && <p className="mt-2 text-muted">La proyección estará completa al ingresar todas las horas reales.</p>}</div>}
         <Textarea label={exceeded ? "Justificación del exceso de horas *" : "Justificación del exceso de horas (si corresponde)"} value={draft.excessReason} maxLength={2000} readOnly={!editable} disabled={busy} onChange={(event) => editDraft({ ...draft, excessReason: event.target.value })} />
         <Textarea label="Observaciones del cierre" value={draft.notes} maxLength={2000} readOnly={!editable} disabled={busy} onChange={(event) => editDraft({ ...draft, notes: event.target.value })} />
         {editable && <Button icon={Save} disabled={busy || !dirty} onClick={saveHours}>Guardar horas y observaciones</Button>}
       </>}
     </CardContent></Card>}
 
-    {editable && canCloseServiceOrder(role) && <Card><CardContent className="space-y-3"><h3 className="font-semibold">Cerrar O/S</h3>{missing.length ? <ul className="list-disc space-y-1 pl-5 text-sm text-muted">{missing.map((message) => <li key={message}>{message}</li>)}</ul> : <p className="text-sm">Documentos y horas registrados. Puede confirmar el cierre.</p>}<Button variant="success" icon={CheckCircle2} disabled={busy || !!missing.length} onClick={() => setConfirmClose(true)}>Cerrar O/S</Button></CardContent></Card>}
-
     {!!snapshot.events.length && <Card><CardHeader><CardTitle>Historial del expediente</CardTitle></CardHeader><CardContent className="space-y-3">{snapshot.events.map((event) => <details key={event.id} className="rounded-xl border border-border p-3 text-sm"><summary className="cursor-pointer">{actionLabels[event.action] || event.action} · {event.actor_name} · {date(event.created_at)}</summary><EventDetails event={event} allocations={allocations} equipment={equipment} /></details>)}</CardContent></Card>}
 
+    {/* El cierre definitivo es la última acción, después de preparar y guardar el expediente. */}
+    {editable && canCloseServiceOrder(role) && <Card><CardContent className="space-y-3"><h3 className="font-semibold">Cerrar O/S</h3>{missing.length ? <ul className="list-disc space-y-1 pl-5 text-sm text-muted">{missing.map((message) => <li key={message}>{message}</li>)}</ul> : <p className="text-sm">Documentos y horas registrados. Puede confirmar el cierre.</p>}<Button variant="success" icon={CheckCircle2} disabled={busy || !!missing.length} onClick={() => setConfirmClose(true)}>Cerrar O/S</Button></CardContent></Card>}
+
     <ConfirmDialog open={confirmClose} onClose={() => !busy && setConfirmClose(false)} loading={busy} danger={false} title="¿Cerrar esta O/S?" confirmLabel="Cerrar O/S"
-      description={"Se confirmarán " + hours(actualUnits / 100) + " horas reales, los documentos y las justificaciones. El saldo del PAR se actualizará y el expediente quedará en consulta."}
+      description={"Se confirmarán " + hours(actualUnits / 100) + " horas reales, los documentos y las fotos. Se publicarán " + (snapshot.fieldWork?.pendingItems.length || 0) + " pendientes para seguimiento. " + (order.order_kind === "Garantia" ? "Las horas de garantía no cambiarán el saldo comercial del PAR. " : "El saldo del PAR se actualizará. ") + "El expediente quedará en consulta."}
       onConfirm={async () => { const next = await action({ action: "close" }); setConfirmClose(false); if (next) { notify.success("O/S cerrada."); await onCompleted?.(); } }} />
-    <ConfirmDialog open={confirmReload} onClose={() => setConfirmReload(false)} title="¿Actualizar el expediente?" description="Los cambios de horas que aún no guardó se descartarán." confirmLabel="Actualizar" onConfirm={async () => { setConfirmReload(false); await load(); }} />
+    <ConfirmDialog open={confirmReload} onClose={() => setConfirmReload(false)} title="¿Actualizar el expediente?" description="Los cambios de horas y pendientes que aún no guardó se descartarán." confirmLabel="Actualizar" onConfirm={async () => { setConfirmReload(false); await load(); }} />
     <Modal open={!!retiring} onClose={() => !busy && setRetiring(null)} title="Retirar archivo" description={retiring?.original_name}
-      footer={<><Button variant="secondary" disabled={busy} onClick={() => setRetiring(null)}>Volver</Button><Button variant="danger" loading={busy} disabled={retirementReason.trim().length < 5} onClick={async () => { if (await run(() => retireOrderClosureFile(orderId, retiring.id, { revision: order.closure_revision, reason: retirementReason.trim() }))) setRetiring(null); }}>Retirar archivo</Button></>}>
-      <Textarea label="Motivo del retiro *" value={retirementReason} maxLength={2000} onChange={(event) => setRetirementReason(event.target.value)} disabled={busy} hint="El archivo permanecerá en el historial y dejará de contar para el cierre." />
+      footer={<><Button variant="secondary" disabled={busy} onClick={() => setRetiring(null)}>Volver</Button><Button variant="danger" loading={busy} disabled={retirementReason.trim().length < 5} onClick={async () => { if (await run(() => (retiring.photo ? retireOrderPhoto : retireOrderClosureFile)(orderId, retiring.id, { revision: order.closure_revision, reason: retirementReason.trim() }))) setRetiring(null); }}>Retirar archivo</Button></>}>
+      <Textarea label="Motivo del retiro *" value={retirementReason} maxLength={2000} onChange={(event) => setRetirementReason(event.target.value)} disabled={busy} hint="El archivo permanecerá en el historial y dejará de estar vigente." />
     </Modal>
   </div>;
 }
@@ -217,6 +255,9 @@ function EventDetails({ event, allocations, equipment }) {
     {details.equipmentIds && <p>{details.equipmentIds.map((id) => equipment.find((item) => item.id === id)?.name || "Equipo registrado").join(", ")}</p>}
     {details.after?.map((actual) => { const row = allocations.find((item) => String(item.id) === String(actual.allocationId)); const previous = details.before?.find((item) => String(item.allocationId) === String(actual.allocationId)); return <p key={actual.allocationId}>{row?.technician_name} · {row?.description}: {previous?.hours == null ? "Sin reporte" : hours(previous.hours) + " h"} → {hours(actual.hours)} h. {actual.note}</p>; })}
     {details.actualHours !== undefined && <p>Estimadas: {hours(details.estimatedHours)} h · Reales: {hours(details.actualHours)} h.</p>}
+    {details.pendingLines && <><p>Pendientes guardados: {details.pendingLines.length}</p>{details.pendingLines.map((item)=><p key={item.id}>{item.description}</p>)}
+      {!!details.previousPendingLines?.length && <details><summary>Listado anterior</summary>{details.previousPendingLines.map((item)=><p key={item.id}>{item.description}</p>)}</details>}</>}
+    {details.publishedPendingCount!==undefined && <p>Pendientes publicados: {details.publishedPendingCount}</p>}
     {details.excessReason && <p>Exceso: {details.excessReason}</p>}{details.notes && <p>Observaciones: {details.notes}</p>}
     {details.previousExcessReason && <p>Justificación anterior: {details.previousExcessReason}</p>}{details.previousNotes && <p>Observaciones anteriores: {details.previousNotes}</p>}
   </div>;

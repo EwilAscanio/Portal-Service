@@ -8,7 +8,7 @@ import { CatalogSearch } from "@/components/par/CatalogSearch";
 import { calculateLineTotalUsd, calculateLineTotalBs, formatCurrencyUsd, formatCurrencyBs } from "@/utils/parCalc";
 import { DEFAULT_PRODUCT_CATEGORY } from "@/lib/par/constants";
 
-export function ParItemsSection({ itemFields, appendItem, removeItem, setFocusItemIndex, items, itemProducts, form, handleProductPick, focusItemIndex, exchangeRate, setLoadOpen }) {
+export function ParItemsSection({ referenceOnly = false, itemFields, appendItem, removeItem, setFocusItemIndex, items, itemProducts, form, handleProductPick, focusItemIndex, exchangeRate, setLoadOpen }) {
   return (
     <>
       {/* Productos adicionales / Mano de obra */}
@@ -60,7 +60,14 @@ export function ParItemsSection({ itemFields, appendItem, removeItem, setFocusIt
           </Button>
         </CardHeader>
         <CardContent>
-          {itemFields.length === 0 ? (
+          {referenceOnly ? <div className="space-y-3">
+            <p className="text-sm text-muted">Seleccione los conceptos que identificarán la mano de obra de garantía. Las cantidades y precios comerciales se guardarán en cero.</p>
+            {itemFields.map((field,index)=><div key={field.id} className="grid items-end gap-3 rounded-xl border border-border p-3 sm:grid-cols-[1fr_1fr_auto]">
+              <CatalogSearch options={itemProducts} value={form.watch(`items.${index}.productId`)} onSelect={(product)=>handleProductPick(index,product)} label="Producto de referencia" placeholder="Buscar producto…" getTitle={(product)=>product.description} getSubtitle={(product)=>[product.code,product.requires_technician ? "Mano de obra" : product.category].join(" · ")} selectedTitle={(product)=>product.description} matches={(product,q)=>[product.code,product.description].join(" ").toLowerCase().includes(q.trim().toLowerCase())} />
+              <Input label="Descripción" {...form.register(`items.${index}.descripcion`)} />
+              <Button type="button" variant="ghost" icon={Trash2} aria-label="Quitar referencia" onClick={()=>removeItem(index)} />
+            </div>)}
+          </div> : itemFields.length === 0 ? (
             <p className="text-sm text-muted">No hay ítems registrados en este PAR.</p>
           ) : (
             <div className="overflow-x-auto">

@@ -1,71 +1,70 @@
-# Maquitech — Panel administrativo
+# Maquitech — Portal de servicios
 
-Panel administrativo para la gestión industrial de Maquitech, construido con Next.js App Router, React, PostgreSQL y NextAuth.
+Portal interno para servicios industriales. **PAR y Órdenes de Servicio son sus documentos centrales**: el PAR define alcance y presupuesto; la O/S programa técnicos, registra ejecución y reúne el expediente de cierre.
 
-## Stack
+## Documentación
 
-- Next.js 16.3.4 y React 19.
-- JavaScript, sin TypeScript.
-- PostgreSQL mediante `pg` y repositorios parametrizados.
-- NextAuth v5 con JWT y Credentials.
-- Tailwind CSS 4, Framer Motion, Recharts y Lucide.
+- [AI_CONTEXT.md](AI_CONTEXT.md): contexto para IA y nuevos colaboradores.
+- [APP_DEPENDENCIES.md](APP_DEPENDENCIES.md): relaciones e impacto entre módulos.
+- [Índice de documentación](docs/README.md): flujo, módulos, datos, permisos y operación.
+- [Flujo del negocio](docs/negocio/flujo-general.md): recorrido completo PAR → O/S → cierre.
+- [Guía de operación](docs/operacion/despliegue-respaldo-migraciones.md): instalación, migraciones y respaldo conjunto.
 
-## Desarrollo
+Antes de modificar el proyecto, leer [AGENTS.md](AGENTS.md) y las guías del área.
 
-Requisitos: Node.js compatible con Next.js 16 y PostgreSQL disponible para las APIs.
+## Stack y desarrollo
 
-```bash
-npm install
+Next.js App Router, React, JavaScript, PostgreSQL mediante pg y NextAuth Credentials/JWT. UI compartida con Tailwind; agenda FullCalendar, importación ExcelJS y PDFs con @react-pdf/renderer. Versiones en package.json y package-lock.json.
+
+Requisitos: Node compatible con el Next instalado y PostgreSQL disponible.
+
+```powershell
+npm ci
 npm run dev
 ```
 
-Copia `.env.example` a `.env.local` y define `AUTH_SECRET`, `DATABASE_URL` (o las variables `DB_*`) y la configuración de Saint si usarás la sincronización.
+Preparar .env.local a partir de .env.example: conexión de base, AUTH_SECRET y, cuando corresponda, integración Saint y carpeta privada de documentos. No publicar valores.
 
-## Scripts
+Base nueva usa db/schema.sql; una base existente requiere revisar/aplicar migraciones pendientes individualmente. Leer la guía operativa antes de ejecutar SQL.
+
+## Comandos
 
 | Comando | Uso |
 |---|---|
-| `npm run dev` | Servidor de desarrollo |
-| `npm run build` | Build de producción |
-| `npm start` | Servir el build |
-| `npm run lint` | ESLint |
-| `npm test` | Pruebas de permisos, regresión, PAR, validadores y migraciones |
-| `npm run test:coverage` | Cobertura nativa de Node |
-| `npm run verify` | Pruebas + lint + build |
-| `npm run db:migrate` | Aplicar migraciones mediante el runner del proyecto |
-| `npm run db:test-schema` | Probar `db/schema.sql` en un esquema temporal con rollback |
+| npm run dev | Desarrollo |
+| npm run build / npm start | Construcción y servicio de producción |
+| npm run lint | ESLint |
+| npm test / npm run test:coverage | Comprobaciones existentes / cobertura |
+| npm run verify | Pruebas + lint + build |
+| npm run db:migrate -- nombre.sql | Una migración explícita; sin argumento usa 031 |
+| npm run db:validate | Validación de base mediante script |
+| npm run db:test-schema | Comprobación del esquema en transacción temporal |
+
+La lista describe herramientas disponibles; no implica que se ejecutaron ni certifica sus resultados actuales.
 
 ## Estructura
 
 ```text
-app/                 rutas App Router y Route Handlers
-components/ui/       sistema visual compartido
-components/par/      componentes PAR
-components/par/sections/  secciones visuales PAR
-components/par/modals/    modales PAR
-hooks/par/            hooks específicos de PAR
-lib/api.js            contrato frontend ↔ API
-lib/repositories/     acceso parametrizado a PostgreSQL
-lib/validators/       esquemas Zod
-lib/par/              constantes y mapeos de dominio PAR
-lib/ui-errors.js      mensajes públicos de errores HTTP
-proxy.js              autenticación y RBAC
-db/schema.sql         esquema consolidado para instalaciones nuevas
-db/migrations/        migraciones incrementales; 031 es idempotente
-spec/                 pruebas automatizadas
+app/                   pantallas y Route Handlers
+components/            UI compartida y módulos
+hooks/                 lógica de interacción
+lib/api.js             contrato frontend/API
+lib/validators/        esquemas Zod
+lib/repositories/      SQL parametrizado y transacciones
+auth.js / proxy.js     sesión y protección de acceso
+db/                    esquema, migraciones y validación
+scripts/ / spec/       operación y comprobaciones
+docs/                  documentación organizada
 ```
 
-## Seguridad y reglas principales
+## Reglas centrales
 
-- La autorización se deniega por defecto y se aplica en `proxy.js` y `lib/permissions.js`.
-- Configuración está restringida al rol Supervisor.
-- Solo Administrador y Supervisor pueden aprobar o rechazar PAR.
-- Las órdenes solo pueden vincularse a PAR con estado `Aprobado`.
-- Los clientes provienen de Saint y sus estados persistidos son `'1'` y `'0'`.
-- `schema_migrations` solo registra migraciones; no es una dependencia funcional del runtime.
+- O/S pertenece a un PAR aprobado; un PAR admite varias órdenes.
+- PAR aprobado solo se edita por Superadministrador, Administrador o Supervisor y sin O/S no canceladas.
+- Las horas de mano de obra proceden de cantidades PAR, se reparten en O/S y se confirman al cerrar.
+- Los documentos de cierre se guardan por equipo en almacenamiento privado.
+- Los reportes los generan usuarios del sistema y permiten vista previa/descarga PDF.
+- Clientes y vendedores Saint usan estados '1'/'0'; otros catálogos tienen sus estados propios. El vendedor se consulta y no se edita en el portal.
+- Rutas desconocidas se deniegan; la matriz completa está en [seguridad](docs/arquitectura/seguridad-permisos.md).
 
-Consulta [AI_CONTEXT.md](AI_CONTEXT.md) y [APP_DEPENDENCIES.md](APP_DEPENDENCIES.md) antes de modificar autenticación, permisos, PAR, SQL o contratos de API.
-
-## Reportes PDF
-
-Reportes de PAR por cliente y horas estimadas/reales por técnico de órdenes cerradas, con filtros, vista previa y descarga. Requiere las migraciones 051/052. Consulta [la guía de reportes](docs/reportes.md) para uso, permisos y despliegue.
+Revisión documental: 22 de octubre de 2026. [Límites observados](docs/pendientes-documentados.md) y [archivo histórico](docs/historico/README.md).

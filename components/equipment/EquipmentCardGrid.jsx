@@ -129,23 +129,35 @@ export function EquipmentCardGrid({
               role="button"
               tabIndex={0}
               aria-haspopup="dialog"
-              aria-label={`Ver información de ${row.name}`}
+              aria-label={`Ver información de ${row.client_name} - ${row.plant_name} - ${row.name}`}
             >
-              <CardContent className="flex flex-1 flex-col gap-2 p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500">
-                    <Cog className="h-4 w-4" />
-                  </span>
-                  <StatusBadge
-                    status={row.status}
-                    variants={EQUIPMENT_STATUS_VARIANTS}
-                  />
+              <CardContent className="flex flex-1 flex-col p-4">
+                <div className="border-b border-border pb-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex flex-col gap-1 items-start min-w-0">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500">
+                        <Cog className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate max-w-full">
+                          {row.client_name || "—"}
+                        </p>
+                        <p className="text-xs text-muted truncate max-w-full">
+                          Planta: {row.plant_name || "—"}
+                        </p>
+                        <p className="text-sm font-semibold text-foreground truncate max-w-full">
+                          Tipo de Equipo: {row.name || "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <StatusBadge
+                      status={row.status}
+                      variants={EQUIPMENT_STATUS_VARIANTS}
+                    />
+                  </div>
                 </div>
-                <p className="line-clamp-2 text-sm font-medium text-foreground">
-                  {row.name}
-                </p>
 
-                <div className="space-y-1.5 border-y border-border py-2 text-xs">
+                <div className="pb-3 border-b border-border pt-3 space-y-1.5 text-xs">
                   <div className="flex items-center gap-2">
                     <Factory className="h-3 w-3 shrink-0 text-blue-500" />
                     <span className="w-16 shrink-0 text-muted">Marca</span>
@@ -169,19 +181,7 @@ export function EquipmentCardGrid({
                   </div>
                 </div>
 
-                <div className="mt-auto space-y-1 pt-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-3 w-3 shrink-0 text-blue-500" />
-                    <span className="w-16 shrink-0 text-muted">Cliente</span>
-                    <span className="truncate text-foreground">
-                      {row.client_name || "—"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Factory className="h-3 w-3 shrink-0 text-blue-500" />
-                    <span className="w-16 shrink-0 text-muted">Planta</span>
-                    <span className="truncate text-foreground">{row.plant_name || "—"}</span>
-                  </div>
+                <div className="pt-3 space-y-1.5 text-xs">
                   <div className="flex items-center gap-2">
                     <Cog className="h-3 w-3 shrink-0 text-blue-500" />
                     <span className="w-16 shrink-0 text-muted">Potencia</span>
@@ -192,6 +192,13 @@ export function EquipmentCardGrid({
                     <span className="w-16 shrink-0 text-muted">Ubicación</span>
                     <span className="truncate text-foreground">
                       {row.location || "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Hash className="h-3 w-3 shrink-0 text-blue-500" />
+                    <span className="w-16 shrink-0 text-muted">Cód. Cliente</span>
+                    <span className="truncate text-foreground">
+                      {row.client_code || "—"}
                     </span>
                   </div>
                 </div>

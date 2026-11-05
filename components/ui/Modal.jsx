@@ -13,6 +13,7 @@ const SIZES = {
   lg: "max-w-lg",
   xl: "max-w-xl",
   "2xl": "max-w-4xl",
+  "3xl": "max-w-7xl",
 };
 
 /**
@@ -27,6 +28,7 @@ export function Modal({
   children,
   footer,
   size = "md",
+  scrollable = false,
 }) {
   const mounted = useSyncExternalStore(
     () => () => {},
@@ -72,11 +74,12 @@ export function Modal({
             transition={{ type: "spring", stiffness: 420, damping: 34 }}
             className={cn(
               "relative w-full overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl",
-              SIZES[size]
+              SIZES[size],
+              scrollable && "flex max-h-[calc(100dvh-2rem)] flex-col"
             )}
           >
             {(title || description) && (
-              <div className="flex items-start justify-between gap-4 px-6 pt-5">
+              <div className="flex shrink-0 items-start justify-between gap-4 px-6 pt-5">
                 <div>
                   {title && (
                     <h2 className="text-lg font-semibold tracking-tight text-foreground">
@@ -97,9 +100,11 @@ export function Modal({
                 </button>
               </div>
             )}
-            <div className="px-6 py-5">{children}</div>
+            <div className={cn("px-6 py-5", scrollable && "min-h-0 overflow-y-auto overscroll-contain")}>
+              {children}
+            </div>
             {footer && (
-              <div className="flex justify-end gap-3 border-t border-border bg-surface-2/50 px-6 py-4">
+              <div className="flex shrink-0 justify-end gap-3 border-t border-border bg-surface-2/50 px-6 py-4">
                 {footer}
               </div>
             )}

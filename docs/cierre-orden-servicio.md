@@ -1,5 +1,8 @@
 # Cierre de órdenes de servicio
 
+> Vigente · actualizado el 31 de octubre de 2026: cierre y horas independientes de garantía. [Índice](README.md).
+> Guía principal del expediente. Para el recorrido completo consultar [O/S](modulos/ordenes-servicio.md), [horas](modulos/horas-tecnicos.md) y [permisos](arquitectura/seguridad-permisos.md).
+
 ## Alcance
 
 Una O/S conserva su programación y reúne el resultado del trabajo de campo en su **Expediente de cierre**. La acción final se llama **Cerrar O/S**. El estado interno sigue siendo `Completada`, compatible con PAR, calendario, filtros y reportes.
@@ -8,14 +11,24 @@ Una O/S conserva su programación y reúne el resultado del trabajo de campo en 
 
 1. Seleccionar un PAR aprobado.
 2. Seleccionar al menos un equipo del PAR. Una O/S puede atender solo una parte de sus equipos.
-3. Distribuir las horas **estimadas** de los renglones de mano de obra entre uno y tres técnicos, indicando el responsable.
+3. Distribuir las horas **estimadas** de los renglones de mano de obra entre uno y cuatro técnicos distintos, incluido el responsable.
 4. Guardar y seguir el flujo de aprobación e inicio del servicio.
 
 Cliente, planta y contacto siguen procediendo del PAR. La descripción de trabajo, vista previa e impresión contienen los equipos seleccionados. La selección general se puede cambiar mientras la orden esté pendiente.
 
+## Acceso y acción final
+
+Durante **En Proceso**, el botón superior **Crear Expediente** abre la preparación de documentos y horas para Superadministrador, Administrador, Supervisor y Coordinador. Es un acceso al expediente de la misma O/S: no crea otro expediente ni cambia el estado. También permite retomar lo ya guardado.
+
+Dentro del expediente, el botón superior pasa a **Vista previa**. El rol Técnico y las órdenes Completadas o Canceladas conservan **Expediente de cierre** como acceso de consulta.
+
+**Cerrar O/S** se encuentra únicamente al final del expediente, después de documentos, horas e historial, para los roles que pueden cerrar. Permanece deshabilitado mientras haya requisitos pendientes, cambios de horas/observaciones sin guardar o una operación en curso. Al habilitarse, abre la confirmación final; solo su confirmación cambia la orden a **Completada**. Abrir el expediente y guardar avances mantienen **En Proceso**.
+
+Fuentes de interfaz: `app/(dashboard)/ordenes/[id]/page.jsx` y `components/service-orders/ServiceOrderClosure.jsx`. Las reglas de cierre siguen validadas por el repositorio, independientemente del botón.
+
 ## Documentos por equipo
 
-Durante **En Proceso**, abrir **Cerrar O/S** o **Expediente de cierre**. Cada equipo requiere resolver estas cuatro categorías:
+Desde **Crear Expediente**, cada equipo requiere resolver estas cuatro categorías:
 
 - Reporte de Servicio.
 - Check List de Trabajo.
@@ -30,22 +43,28 @@ Los archivos se pueden abrir y descargar. **Retirar** exige un motivo y conserva
 
 El historial identifica el archivo, tamaño, usuario, fecha y retiro/reemplazo. Las justificaciones de No aplica también conservan su historial.
 
+## Fotos y lista de pendientes
+
+El expediente incluye **Fotos del servicio**, con hasta cinco JPG/PNG opcionales por O/S, y **Lista de pendientes**, con un texto por renglón y guardado como borrador. Cliente y planta se obtienen de la orden; no se distinguen equipos en estas dos secciones.
+
+Los técnicos programados con usuario vinculado pueden preparar estas secciones durante En Proceso; los gestores del cierre también. Este permiso no amplía la escritura de horas ni de los cuatro documentos por equipo. Al cerrar se publican los renglones activos como Pendiente junto con el cierre, en una sola transacción. El seguimiento posterior vive en su propia ventana y card del dashboard. [Reglas, permisos, archivos y seguimiento](modulos/pendientes.md).
+
 ## Registrar horas reales
 
-La tabla muestra los renglones de mano de obra y los técnicos **ya programados**. No se incorporan otros técnicos durante el cierre.
+La tabla muestra los renglones de mano de obra y los técnicos **ya programados**, hasta cuatro por orden. No se incorporan otros técnicos durante el cierre; el cuarto debe tener su asignación previa y reportar sus horas como los demás.
 
 - Registrar expresamente las horas reales reportadas, hasta dos decimales. Los campos no se rellenan automáticamente con la estimación.
 - Si un técnico no participó en una asignación, registrar **0** y explicar el motivo.
 - Las horas reales corresponden al técnico y renglón del PAR. Dos técnicos que trabajan cuatro horas cada uno representan ocho horas de mano de obra.
 - Un mismo técnico puede tener varias asignaciones; cada una mantiene su producto, descripción y tipo de mano de obra.
 - Guardar las horas y observaciones antes de cerrar. Guardar un borrador no libera presupuesto.
-- Si alguna asignación supera su estimación, o las horas reales superan el saldo del renglón del PAR, justificar el exceso antes de cerrar.
+- Si alguna asignación supera su estimación, o en una O/S Normal las horas reales superan el saldo del renglón del PAR, justificar el exceso antes de cerrar.
 
 La programación, los técnicos originales y las estimaciones se conservan. Las horas reales no se deducen de las fechas programadas, del momento del cierre ni del multiplicador comercial. El PAR mantiene sus cantidades cotizadas y totales monetarios. No se calculan comisiones ni pagos en esta etapa.
 
 ## Saldo de horas
 
-El saldo se calcula **por renglón del PAR**. Dos renglones con el mismo producto tienen presupuestos independientes:
+Esta sección aplica a O/S **Normal**. El saldo se calcula **por renglón del PAR**, excluyendo garantías. Dos renglones con el mismo producto tienen presupuestos independientes:
 
 `Disponible = cantidad presupuestada − estimaciones de órdenes abiertas − horas reales de órdenes cerradas con expediente`.
 
@@ -58,6 +77,10 @@ Las órdenes completadas antes de esta implementación, sin horas reales confirm
 | 8 | 10 | Consume 2 adicionales; exige justificación |
 
 Se permite cerrar aunque el consumo supere el presupuesto, con justificación. La interfaz identifica el exceso y muestra cero horas disponibles para nuevas asignaciones del renglón agotado. Las estimaciones de otras órdenes existentes se conservan. Los saldos de PAR con revisiones históricas pendientes son provisionales y las nuevas reservas siguen bloqueadas hasta resolverlas.
+
+## Cierre de garantías
+
+Las garantías usan este mismo expediente y permisos, incluidos los cuatro documentos por equipo, fotos y publicación de pendientes. El cierre confirma las reales de garantía sin consumir ni liberar horas comerciales; la interfaz no proyecta ese consumo contra el saldo PAR. Exige justificación cuando una asignación supera su estimación propia. El origen y trabajos pertenecen a la nueva O/S y la anterior permanece cerrada. [Flujo completo](modulos/garantias.md).
 
 ## Permisos
 
@@ -80,21 +103,22 @@ La pantalla muestra los requisitos pendientes y exige:
 3. Revisión de las horas anteriores de la orden, si corresponde.
 4. Horas reales de todas las asignaciones, con explicación de los ceros.
 5. Justificación de los excesos.
-6. Cambios de horas y observaciones guardados.
+6. Cambios de horas, observaciones y lista de pendientes guardados, sin operaciones en curso.
+7. Fotos guardadas disponibles, con un máximo de cinco vigentes; no se exige adjuntar fotos ni agregar pendientes.
 
-Al confirmar, el servidor valida otra vez, registra usuario y fecha, fija el total de horas reales, cambia el estado a Completada y actualiza el consumo de horas mediante una sola transacción. Si otra persona modificó el expediente, se debe actualizar antes de continuar; la pantalla avisa antes de descartar horas locales sin guardar.
+Al confirmar, el servidor valida otra vez, registra usuario y fecha, fija el total de horas reales, cambia el estado a Completada y, para órdenes normales, actualiza el consumo comercial mediante una sola transacción. Las horas de garantía se confirman aparte. Si otra persona modificó el expediente, se debe actualizar antes de continuar; la pantalla avisa antes de descartar horas locales sin guardar.
 
-El calendario conserva la programación original. Vista previa, impresión, tabla, tarjetas y CSV distinguen estimaciones de horas reales confirmadas.
+El cierre publica los pendientes activos una sola vez y conserva sus datos de origen. Resolverlos después no cambia el cierre ni sus horas. El calendario conserva la programación original. Vista previa, impresión, tabla, tarjetas y CSV distinguen estimaciones de horas reales confirmadas.
 
 ## Órdenes anteriores
 
 - Las órdenes abiertas de antes de la migración requieren confirmar los equipos: la interfaz anterior mostraba todos los del PAR. Las pendientes pueden seleccionarlos en su edición; las órdenes en proceso los confirman en el expediente.
-- Las seis órdenes que ya estaban completadas al aplicar la migración quedaron identificadas como cierres anteriores. No se reabrieron ni se inventaron documentos, usuarios de cierre o horas reales.
+- Las órdenes que ya estaban completadas al aplicar la migración quedan identificadas como cierres anteriores. No se reabren ni se inventan documentos, usuarios de cierre o horas reales. Los conteos de una instalación pertenecen a su nota histórica, no al contrato del módulo.
 - Las revisiones históricas de horas introducidas en la migración 051 siguen vigentes.
 
 ## Almacenamiento y operación en servidor propio
 
-No hay servicios de almacenamiento externos ni dependencias npm nuevas.
+El expediente utiliza almacenamiento local privado; su implementación no requiere un servicio de almacenamiento externo.
 
 Variable opcional **`SERVICE_ORDER_DOCUMENTS_DIR`**: ruta de una carpeta privada persistente. En el entorno local, sin configurarla, se usa `.private/service-order-documents` dentro del proyecto; está excluida de Git. La carpeta se crea con la primera carga.
 
@@ -137,10 +161,20 @@ El contenido se escribe y sincroniza en disco antes de confirmar sus metadatos. 
 - La familia de rutas conserva el permiso general `/api/service-order`; las nuevas rutas vuelven a validar sesión activa y rol. No hay entrada adicional de menú: se accede desde la orden existente.
 - No hay cálculo de comisiones ni cambios a la agenda original.
 
-Para otra base existente, después de un respaldo, ejecutar:
+Para una base existente donde la 052 esté pendiente y sus prerrequisitos estén aplicados, después de un respaldo:
 
 ```powershell
 npm run db:migrate -- 052-service-order-closure.sql
 ```
 
-La migración se aplicó en la base configurada del entorno el 22 de octubre de 2026, con respaldo previo. Las comprobaciones de entrega se registran en `AI_CONTEXT.md`.
+La aplicación de una migración en un entorno no acredita que esté aplicada en otro. Consultar [operación y migraciones](operacion/despliegue-respaldo-migraciones.md) y las [notas históricas](historico/README.md). La evidencia de aplicación es específica de cada entrega y entorno.
+
+### Fuentes de implementación
+
+- `lib/service-order-closure.js` y `lib/service-order-closure-api.js`: reglas compartidas y acceso.
+- `lib/repositories/service-order-closure.repository.js`: lecturas, revisión, validaciones y transacciones.
+- `lib/repositories/service-order-equipment.repository.js`: alcance por equipos.
+- `lib/service-order-storage.js`: almacenamiento privado, formato, tamaño y hash.
+- `lib/validators/service-order-closure.schema.js`: contratos de acciones.
+- `components/service-orders/ServiceOrderClosure.jsx`: interfaz del expediente.
+- `app/api/service-order/[id]/closure/`: rutas autenticadas de expediente y archivos.

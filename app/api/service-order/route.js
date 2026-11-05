@@ -28,7 +28,7 @@ export async function GET(request) {
     const clientId = searchParams.get("clientId") || undefined;
     const plantId = searchParams.get("plantId") || undefined;
 
-    const orders = await ordersRepo.findAll({ status, priority, search, clientId, plantId });
+    const orders = await ordersRepo.findAll({ status, priority, search, clientId, plantId, orderKind: searchParams.get("orderKind") || undefined });
     return NextResponse.json(orders);
   } catch (error) {
     console.error("Error al listar órdenes:", error);

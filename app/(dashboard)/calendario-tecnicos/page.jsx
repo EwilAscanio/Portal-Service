@@ -11,7 +11,7 @@ export default function CalendarioTecnicosPage() {
     <div className="space-y-6">
       <PageHeader
         title="Calendario de Técnicos"
-        description="Agenda generada exclusivamente desde órdenes de servicio aprobadas."
+        description="Programación de órdenes aprobadas y períodos de no disponibilidad de los técnicos. Hora de Venezuela."
       />
       <TechnicianCalendar />
     </div>

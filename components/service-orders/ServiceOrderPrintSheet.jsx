@@ -1,3 +1,4 @@
+import { WarrantySummary } from "@/components/service-orders/WarrantySummary";
 import { LaborAllocationSummary } from "@/components/service-orders/LaborAllocationSummary";
 const WORK_TYPES = { Internal: "INTERNA", External: "EXTERNA" };
 const SERVICE_TYPES = { Inspection: "REVISIÓN", Maintenance: "MANTENIMIENTO", Emergency: "EMERGENCIA", Other: "OTRO" };
@@ -17,12 +18,13 @@ export function ServiceOrderPrintSheet({ order }) {
             <div className="flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center bg-slate-900 text-xl font-black text-white">M</div><div><h1 className="text-lg font-black">MAQUITECH Distribuidores C.A.</h1><p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Venta, servicio y mantenimiento de equipos industriales</p></div></div>
             <div className="text-right"><h2 className="text-base font-black uppercase">Orden de Servicio</h2><p className="text-lg font-black text-indigo-900">NRO. <span className="underline">{order.order_code}</span></p><p className="text-[10px] font-bold uppercase">Estado: {order.status}</p></div>
           </header>
+          <WarrantySummary order={order} />
 
           <div className="mb-3 divide-y divide-slate-900 border border-slate-900 text-xs">
             <PrintRow label="EMPRESA" value={order.client_name} />
             <PrintRow label="PLANTA" value={`${order.plant_name || "—"}${order.plant_address ? ` · ${order.plant_address}` : ""}`} />
             <PrintRow label="CONTACTO" value={`${order.contact_name || "—"}${order.contact_phone ? ` · ${order.contact_phone}` : ""}${order.contact_email ? ` · ${order.contact_email}` : ""}`} />
-            <div className="grid grid-cols-12 divide-x divide-slate-900"><CellLabel>PAR</CellLabel><Cell>{order.par_number}</Cell><CellLabel>ORDEN DE COMPRA</CellLabel><Cell>{order.purchase_order_number || "—"}</Cell><CellLabel>COTIZACIÓN</CellLabel><Cell>{order.quotation_number || "—"}</Cell></div>
+            {order.order_kind === "Garantia" ? <PrintRow label="PAR" value={order.par_number} /> : <div className="grid grid-cols-12 divide-x divide-slate-900"><CellLabel>PAR</CellLabel><Cell>{order.par_number}</Cell><CellLabel>ORDEN DE COMPRA</CellLabel><Cell>{order.purchase_order_number || "—"}</Cell><CellLabel>COTIZACIÓN</CellLabel><Cell>{order.quotation_number || "—"}</Cell></div>}
           </div>
 
           <div className="mb-3 grid grid-cols-4 divide-x divide-slate-900 border border-slate-900 text-[10px]"><PrintBox label="TIPO DE TRABAJO" value={WORK_TYPES[order.work_type] || order.work_type} /><PrintBox label="TIPO DE SERVICIO" value={SERVICE_TYPES[order.service_type] || order.service_type} /><PrintBox label="FECHA DE LLAMADA" value={dateTime(order.call_date)} /><PrintBox label="PRIORIDAD" value={order.priority} /></div>

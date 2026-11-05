@@ -25,6 +25,7 @@ import { FadeInUp } from "@/components/ui/animated";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { TechnicalFormModal } from "@/components/technical/TechnicalFormModal";
 import { TechnicalViewModal } from "@/components/technical/TechnicalViewModal";
+import { TechnicalAvailability } from "@/components/technical/TechnicalAvailability";
 import { cn } from "@/utils/cn";
 import { ACTIVE_STATUS, INACTIVE_STATUS } from "@/lib/par/constants";
 
@@ -48,6 +49,7 @@ export default function TecnicosPage() {
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [formInstance, setFormInstance] = useState(0);
   const [viewTech, setViewTech] = useState(null);
   const [saving, setSaving] = useState(false);
   const [confirm, setConfirm] = useState({ open: false, technician: null });
@@ -83,8 +85,8 @@ export default function TecnicosPage() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadData(); }, [loadData]);
 
-  const handleCreate = () => { setEditing(null); setFormOpen(true); };
-  const handleEdit = (tech) => { setEditing(tech); setFormOpen(true); };
+  const handleCreate = () => { setEditing(null); setFormInstance((value) => value + 1); setFormOpen(true); };
+  const handleEdit = (tech) => { setEditing(tech); setFormInstance((value) => value + 1); setFormOpen(true); };
 
   const handleSubmit = async (payload) => {
     setSaving(true);
@@ -155,9 +157,9 @@ export default function TecnicosPage() {
       header: "Estado",
       sortable: true,
       render: (row) => (
-        <Badge variant={row.status === ACTIVE_STATUS ? "success" : "danger"} dot>
+        <div className="flex flex-wrap gap-1"><Badge variant={row.status === ACTIVE_STATUS ? "success" : "danger"} dot>
           {row.status}
-        </Badge>
+        </Badge><TechnicalAvailability unavailability={row.unavailability} /></div>
       ),
     },
     {
@@ -264,7 +266,7 @@ export default function TecnicosPage() {
       </FadeInUp>
 
       <TechnicalFormModal
-        key={editing?.id ?? "create"}
+        key={formInstance}
         open={formOpen}
         onClose={() => setFormOpen(false)}
         onSubmit={handleSubmit}
@@ -274,6 +276,7 @@ export default function TecnicosPage() {
 
       <TechnicalViewModal
         tech={viewTech}
+        onUnavailabilityChanged={loadData}
         onClose={() => setViewTech(null)}
         onEdit={(tech) => {
           setViewTech(null);

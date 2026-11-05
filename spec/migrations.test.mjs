@@ -113,4 +113,32 @@ assert.match(equipmentStatusesMigration, /'Mudado', 'Desechado', 'Validar'/);
 assert.match(equipmentStatusesMigration, /schema_migrations/);
 assert.match(schema, /status IN \('Operativo','En Mantenimiento','Fuera de Servicio','Mudado','Desechado','Validar'\)/);
 
+const fourTechniciansMigration = fs.readFileSync("db/migrations/054-service-order-four-technicians.sql", "utf8");
+assert.match(fourTechniciansMigration, /CREATE OR REPLACE FUNCTION enforce_service_order_technician_limit/);
+assert.match(fourTechniciansMigration, />= 4/);
+assert.match(fourTechniciansMigration, /lock_timeout/);
+assert.match(schema, /enforce_service_order_technician_limit\(\)[^;]*>= 4/);
+assert.doesNotMatch(fourTechniciansMigration, /\b(DELETE FROM|TRUNCATE|UPDATE service_order)\b/i);
+
 console.log("Migration artifact tests passed.");
+
+const vacationsMigration = fs.readFileSync("db/migrations/055-technician-vacations-rescheduling.sql", "utf8");
+for (const table of ["technical_vacation", "technical_vacation_event", "service_order_schedule_event"]) {
+  assert.ok(vacationsMigration.includes(`CREATE TABLE ${table} (`));
+  assert.ok(schema.includes(`CREATE TABLE ${table} (`));
+}
+assert.match(vacationsMigration, /ADD COLUMN schedule_revision INTEGER NOT NULL DEFAULT 0/);
+assert.match(vacationsMigration, /end_date >= start_date/);
+assert.match(vacationsMigration, /cancellation_reason IS NOT NULL/);
+assert.doesNotMatch(vacationsMigration, /\b(DELETE FROM|TRUNCATE|UPDATE service_order|DROP TABLE)\b/i);
+console.log("Vacation migration artifact tests passed.");
+
+const unavailabilityMigration = fs.readFileSync("db/migrations/058-technician-unavailability.sql", "utf8");
+assert.ok(schema.includes(unavailabilityMigration));
+assert.match(unavailabilityMigration, /RENAME TO technical_unavailability/);
+assert.match(unavailabilityMigration, /RENAME COLUMN vacation_id TO unavailability_id/);
+assert.match(unavailabilityMigration, /reason_type VARCHAR\(24\) NOT NULL DEFAULT 'Vacaciones'/);
+assert.match(unavailabilityMigration, /ALTER COLUMN reason_type DROP DEFAULT/);
+assert.match(unavailabilityMigration, /technical_unavailability_other_note_check/);
+assert.doesNotMatch(unavailabilityMigration, /\b(DELETE FROM|TRUNCATE|DROP TABLE|UPDATE technical_vacation_event)\b/i);
+console.log("Unavailability migration artifact tests passed.");

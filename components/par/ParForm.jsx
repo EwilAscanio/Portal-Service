@@ -1,5 +1,6 @@
 "use client";
 
+import { PAR_PURPOSES } from "@/lib/warranty";
 import { budgetedLaborHours } from "@/lib/labor-hours";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -21,7 +22,8 @@ import {
 import {
   parHeaderSchema,
 } from "@/lib/validators";
-import { calculateLineTotalUsd, calculateLineTotalBs, formatCurrencyUsd, formatCurrencyBs } from "@/utils/parCalc";
+import { formatCurrencyUsd, formatCurrencyBs } from "@/utils/parCalc";
+import { calculateParTotals } from "@/lib/par-calculation";
 import { useParCatalogs } from "@/hooks/par/useParCatalogs";
 import { parFormSchema as extractedParFormSchema, formatIssues } from "@/components/par/parFormSchema";
 import { ParEquipmentSection } from "@/components/par/sections/ParEquipmentSection";
@@ -56,13 +58,12 @@ export function ParForm({
   const { clients, plants, contacts, productCatalog, loading: catalogsLoading, error: catalogsError, retry: retryCatalogs } = useParCatalogs();
   const watchedItems = useWatch({ control: form.control, name: "items" });
   const items = useMemo(() => (watchedItems ?? []).map((item) => ({ ...item, requiresTechnician: item.requiresTechnician ?? productCatalog.find((product) => product.id === item.productId)?.requires_technician ?? false })), [watchedItems, productCatalog]);
+  const purpose = useWatch({ control: form.control, name: "purpose" }) || "Comercial";
+  const referenceOnly = purpose === "ReferenciaGarantia";
   const exchangeRate = form.watch("exchangeRate") || "0";
+  const discountPercent = form.watch("discountPercent") ?? "0";
 
-  const totals = useMemo(() => {
-    const totalUsd = items.reduce((sum, item) => sum + calculateLineTotalUsd(item), 0);
-    const rate = Number(exchangeRate) || 0;
-    return { totalUsd, totalBs: Number((totalUsd * rate).toFixed(2)) };
-  }, [items, exchangeRate]);
+  const totals = useMemo(() => calculateParTotals(referenceOnly ? [] : items, exchangeRate, referenceOnly ? 0 : discountPercent), [items, exchangeRate, discountPercent, referenceOnly]);
 
   const [clientEquipment, setClientEquipment] = useState([]);
 
@@ -299,15 +300,17 @@ export function ParForm({
       }));
 
     return {
+      purpose: values.purpose || "Comercial",
       clientId: values.clientId,
       plantId: values.plantId,
       contactId: values.contactId,
       fechaEmision: values.fechaEmision || null,
       exchangeRate: Number(values.exchangeRate) || 0,
+      discountPercent: referenceOnly ? 0 : Number(values.discountPercent ?? 0),
       observations: values.observations || null,
       elaboradoPor: values.elaboradoPor || null,
       equipment,
-      items,
+      items: referenceOnly ? items.map((item)=>({...item,qty:0,valorUnitUsd:0,valorPercent:0,multiplicador:1})) : items,
     };
   }
 
@@ -347,6 +350,8 @@ export function ParForm({
           )}
         </CardHeader>
         <CardContent>
+          <div className="mb-4 space-y-2"><Select label="Finalidad del PAR" value={purpose} disabled={isLocked} options={PAR_PURPOSES} onChange={(event)=>form.setValue("purpose",event.target.value)} />
+          {referenceOnly && <p className="text-sm text-muted">Referencia para una garantía histórica. Registre el cliente, equipos, trabajos y conceptos de mano de obra; los importes y el presupuesto cotizado se guardan en cero. Las horas se estiman en la O/S de garantía.</p>}</div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <ClientSearch
               clients={clients}
@@ -445,6 +450,7 @@ export function ParForm({
       />
 
       <ParItemsSection
+        referenceOnly={referenceOnly}
         itemFields={itemFields}
         appendItem={appendItem}
         removeItem={removeItem}
@@ -458,7 +464,7 @@ export function ParForm({
         setLoadOpen={setLoadOpen}
       />
 
-      <ParFormSummary
+      {referenceOnly ? <Card><CardContent><p>PAR de referencia para garantía · sin importe comercial ni horas cotizadas.</p></CardContent></Card> : <ParFormSummary
         variant={variant}
         isLocked={isLocked}
         form={form}
@@ -466,11 +472,13 @@ export function ParForm({
         submitLabel={submitLabel}
         totals={{
           hours: budgetedLaborHours(items).toFixed(2),
+          subtotal: formatCurrencyUsd(totals.subtotalUsd),
+          discount: formatCurrencyUsd(totals.discountAmountUsd),
           usd: formatCurrencyUsd(totals.totalUsd),
           bs: formatCurrencyBs(totals.totalBs),
           rate: formatCurrencyBs(Number(exchangeRate) || 0),
         }}
-      />
+      />}
       <ParTemplateLoadModal
         open={loadOpen}
         onClose={() => setLoadOpen(false)}

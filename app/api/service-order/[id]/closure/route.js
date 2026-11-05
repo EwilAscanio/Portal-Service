@@ -6,16 +6,17 @@ import { getClosure, updateClosure } from "@/lib/repositories/service-order-clos
 export const runtime = "nodejs";
 export async function GET(request, { params }) {
   try {
-    const { response } = await closureActor();
+    const { actor, response } = await closureActor();
     if (response) return response;
     const { id } = await params;
     if (!validOrderId(id)) return NextResponse.json({ error: "Orden inválida." }, { status: 400 });
-    return NextResponse.json(await getClosure(id), { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json(await getClosure(id, actor), { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return closureApiError(error); }
 }
 export async function PUT(request, { params }) {
   try {
-    const { actor, response } = await closureActor(true);
+    // El repositorio autoriza cada acción: Técnico solo puede guardar sus pendientes.
+    const { actor, response } = await closureActor();
     if (response) return response;
     const { id } = await params;
     if (!validOrderId(id)) return NextResponse.json({ error: "Orden inválida." }, { status: 400 });

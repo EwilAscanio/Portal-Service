@@ -22,22 +22,22 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { cn } from "@/utils/cn";
 import { CALENDAR_ORDER_STATUS, getCalendarOrderStatus, getFullCalendarEventStyle } from "@/lib/technician-calendar-status";
+import { OPERATION_TIME_ZONE, operationDate } from "@/lib/technician-unavailability";
 
 const SERVICE_LABELS = { Inspection: "Revisión", Maintenance: "Mantenimiento", Emergency: "Emergencia", Other: "Otro" };
 const WORK_LABELS = { Internal: "Interna", External: "Externa" };
-const EMPTY_DATA = { events: [], technicians: [], clients: [], plants: [], summary: { orders: 0, technicians: 0, assignments: 0, conflicts: 0 }, scope: { type: "all" } };
+const EMPTY_DATA = { events: [], unavailability: [], technicians: [], clients: [], plants: [], summary: { orders: 0, technicians: 0, assignments: 0, conflicts: 0 }, scope: { type: "all" } };
 
 function sameLocalDay(value, selectedDate) {
-  const date = new Date(value);
-  return date.getFullYear() === selectedDate.getFullYear() && date.getMonth() === selectedDate.getMonth() && date.getDate() === selectedDate.getDate();
+  return operationDate(value) === operationDate(selectedDate);
 }
 
 function formatTime(value) {
-  return new Intl.DateTimeFormat("es-VE", { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(value));
+  return new Intl.DateTimeFormat("es-VE", { timeZone: OPERATION_TIME_ZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(value));
 }
 
 function formatLongDate(value) {
-  return new Intl.DateTimeFormat("es-VE", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(value);
+  return new Intl.DateTimeFormat("es-VE", { timeZone: OPERATION_TIME_ZONE, weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(value);
 }
 
 function Kpi({ icon: Icon, label, value, danger = false }) {
@@ -67,6 +67,7 @@ export function TechnicianCalendar() {
       setError("");
       const response = await getTechnicianCalendar({ from: range.start, to: range.end, ...filters });
       setData(response);
+      setSelectedEvent(null);
       if (response.scope?.type === "own") {
         setFilters((current) => current.technicianId === response.scope.technicianId ? current : { ...current, technicianId: response.scope.technicianId });
       }
@@ -90,9 +91,10 @@ export function TechnicianCalendar() {
       ...getFullCalendarEventStyle(event.status, event.has_conflict),
       extendedProps: event,
     };
-  }), [data.events]);
+  }).concat((data.unavailability || []).map((event) => ({ id: event.id, title: `No disponibilidad · ${event.technician_name}`, start: event.start_at, end: event.end_at, allDay: true, color: "#7c3aed", contrastColor: "#ffffff", extendedProps: event }))), [data.events, data.unavailability]);
 
   const dayAgenda = useMemo(() => data.events.filter((event) => sameLocalDay(event.start_at, selectedDate)).toSorted((a, b) => new Date(a.start_at) - new Date(b.start_at)), [data.events, selectedDate]);
+  const dayUnavailability = (data.unavailability || []).filter((event) => event.start_date <= operationDate(selectedDate) && event.end_date >= operationDate(selectedDate));
   const availablePlants = useMemo(() => data.plants.filter((plant) => !filters.clientId || plant.clientId === filters.clientId), [data.plants, filters.clientId]);
 
   const setFilter = (key) => (event) => {
@@ -139,16 +141,17 @@ export function TechnicianCalendar() {
             <FullCalendar
               ref={calendarRef}
               plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, classicThemePlugin]}
-              themeSystem="classic" locale={esLocale} initialView="timeGridWeek"
+              themeSystem="classic" locale={esLocale} initialView="timeGridWeek" timeZone={OPERATION_TIME_ZONE}
               headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek" }}
               buttonText={{ today: "Hoy", month: "Mes", week: "Semana", day: "Día", list: "Agenda" }}
-              allDaySlot={false} slotMinTime="06:00:00" slotMaxTime="20:00:00" slotDuration="00:30:00"
+              allDaySlot allDayText="Todo el día" slotMinTime="06:00:00" slotMaxTime="20:00:00" slotDuration="00:30:00"
               nowIndicator navLinks editable={false} selectable={false} eventStartEditable={false} eventDurationEditable={false}
               height="auto" events={calendarEvents} datesSet={handleDatesSet}
               dateClick={(info) => setSelectedDate(info.date)}
               eventClick={(info) => { setSelectedEvent(info.event.extendedProps); setSelectedDate(info.event.start); }}
               windowResize={handleWindowResize}
               eventContent={(info) => {
+                if (info.event.extendedProps.kind === "unavailability") return <div className="overflow-hidden px-1 py-0.5"><p className="truncate text-[10px] font-bold">No disponibilidad</p><p className="truncate text-[11px]">{info.event.extendedProps.technician_name}</p></div>;
                 const presentation = getCalendarOrderStatus(info.event.extendedProps.status);
                 return <div className="overflow-hidden px-0.5 py-0.5"><p className="truncate text-[9px] font-bold uppercase tracking-wide opacity-90">{presentation.label}</p><p className="truncate text-[11px] font-bold">{info.event.title}</p><p className="truncate text-[10px] opacity-90">{info.event.extendedProps.technician_name}</p><p className="truncate text-[10px] opacity-90">{info.event.extendedProps.client_name} · {info.event.extendedProps.plant_name}</p></div>;
               }}
@@ -161,13 +164,15 @@ export function TechnicianCalendar() {
                 </span>
               ))}
               <span className="inline-flex items-center gap-2 text-xs text-muted"><span className="h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-red-500/20" />Conflicto de horario</span>
+              <span className="inline-flex items-center gap-2 text-xs text-muted"><span className="h-2.5 w-2.5 rounded-full bg-violet-600" />No disponibilidad · {(data.unavailability || []).length} períodos</span>
             </div>
           </div>
         </CardContent></Card>
 
         <Card className="h-fit xl:sticky xl:top-4"><CardContent className="space-y-4 p-4">
           <div><p className="text-base font-semibold text-foreground">Agenda del día</p><p className="mt-1 text-xs capitalize text-muted">{formatLongDate(selectedDate)}</p></div>
-          {selectedEvent && <div className="space-y-3 rounded-xl border border-blue-500/30 bg-blue-500/5 p-3">
+          {selectedEvent?.kind === "unavailability" && <div className="space-y-2 rounded-xl border border-violet-500/30 bg-violet-500/5 p-3"><Badge variant="purple">No disponibilidad</Badge><p className="font-semibold">{selectedEvent.technician_name}</p><p className="text-sm">{selectedEvent.start_date} al {selectedEvent.end_date}, incluido.</p><p className="text-xs text-muted">No disponible para asignaciones durante este período.</p></div>}
+          {selectedEvent && selectedEvent.kind !== "unavailability" && <div className="space-y-3 rounded-xl border border-blue-500/30 bg-blue-500/5 p-3">
             <div className="flex items-start justify-between gap-2"><div><p className="font-bold text-foreground">{selectedEvent.order_code}</p><p className="text-xs text-muted">PAR {selectedEvent.par_number}</p></div><Badge variant={getCalendarOrderStatus(selectedEvent.status).badgeVariant} dot>{getCalendarOrderStatus(selectedEvent.status).label}</Badge></div>
             <p className="flex items-center gap-2 text-xs text-foreground"><Clock3 className="h-3.5 w-3.5 text-blue-500" />{formatTime(selectedEvent.start_at)} – {formatTime(selectedEvent.end_at)}</p>
             <p className="flex items-center gap-2 text-xs text-foreground"><HardHat className="h-3.5 w-3.5 text-blue-500" />{selectedEvent.technician_name}</p>
@@ -178,7 +183,8 @@ export function TechnicianCalendar() {
           </div>}
           <div className="space-y-2">
             {dayAgenda.map((event) => <button key={event.id} type="button" onClick={() => setSelectedEvent(event)} className="w-full rounded-xl border border-border p-3 text-left transition-colors hover:border-blue-500/40 hover:bg-blue-500/5"><div className="flex items-center justify-between gap-2"><span className="inline-flex items-center gap-2 text-xs font-bold text-foreground"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: getCalendarOrderStatus(event.status).backgroundColor }} />{event.order_code}</span><span className="text-[11px] text-muted">{formatTime(event.start_at)}–{formatTime(event.end_at)}</span></div><p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-muted">{getCalendarOrderStatus(event.status).label}</p><p className="mt-1 truncate text-xs text-foreground">{event.technician_name}</p><p className="truncate text-[11px] text-muted">{event.client_name} · {event.plant_name}</p></button>)}
-            {!dayAgenda.length && !loading && <EmptyState icon={CalendarCheck2} title="Sin órdenes programadas" description="No hay órdenes aprobadas para este día." />}
+            {dayUnavailability.map((event) => <button key={event.id} type="button" onClick={() => setSelectedEvent(event)} className="w-full space-y-1 rounded-xl border border-violet-500/30 bg-violet-500/5 p-3 text-left"><p className="text-xs font-bold">No disponibilidad · Todo el día</p><p className="text-xs">{event.technician_name}</p></button>)}
+            {!dayAgenda.length && !dayUnavailability.length && !loading && <EmptyState icon={CalendarCheck2} title="Sin programación" description="No hay órdenes aprobadas ni períodos de no disponibilidad para este día." />}
           </div>
         </CardContent></Card>
       </div>

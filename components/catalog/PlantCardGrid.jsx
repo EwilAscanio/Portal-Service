@@ -113,19 +113,26 @@ export function PlantCardGrid({ plants, loading, onEdit, onDelete }) {
               role="button"
               tabIndex={0}
               aria-haspopup="dialog"
-              aria-label={`Ver información de ${row.name}`}
+              aria-label={`Ver información de ${row.client_name} - ${row.name}`}
             >
-              <CardContent className="flex flex-1 flex-col gap-2 p-4">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500">
-                    <Factory className="h-4 w-4" />
-                  </span>
-                  <p className="line-clamp-2 text-sm font-medium text-foreground">
-                    {row.name}
-                  </p>
+              <CardContent className="flex flex-1 flex-col p-4">
+                <div className="border-b border-border pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500">
+                      <Factory className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <p className="line-clamp-2 text-sm font-medium text-foreground">
+                        {row.client_name || "—"}
+                      </p>
+                      <p className="text-xs text-muted truncate">
+                        {row.name || "—"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-1.5 border-y border-border py-2 text-xs">
+                <div className="border-t border-border pt-3 space-y-1.5 text-xs">
                   <div className="flex items-center gap-2">
                     <Hash className="h-3 w-3 shrink-0 text-blue-500" />
                     <span className="w-20 shrink-0 text-muted">Código</span>
@@ -140,21 +147,11 @@ export function PlantCardGrid({ plants, loading, onEdit, onDelete }) {
                       {row.address || "—"}
                     </span>
                   </div>
-                </div>
-
-                <div className="mt-auto space-y-1 pt-2 text-xs">
                   <div className="flex items-center gap-2">
                     <Hash className="h-3 w-3 shrink-0 text-blue-500" />
                     <span className="w-20 shrink-0 text-muted">Cód. Cliente</span>
                     <span className="truncate font-medium text-foreground">
                       {row.client_code || "—"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-3 w-3 shrink-0 text-blue-500" />
-                    <span className="w-20 shrink-0 text-muted">Cliente</span>
-                    <span className="truncate text-foreground">
-                      {row.client_name || "—"}
                     </span>
                   </div>
                 </div>

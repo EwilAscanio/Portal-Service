@@ -1,3 +1,4 @@
+import { orderKindLabel, parPurposeLabel } from "@/lib/warranty";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Document, Image, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
@@ -23,9 +24,11 @@ const styles = StyleSheet.create({
 });
 
 const PAR_COLUMNS = [
-  { label: "PAR", width: 9 }, { label: "Creado el", width: 10 }, { label: "Cliente", width: 26 },
-  { label: "Planta", width: 20 }, { label: "Estado", width: 12 },
-  { label: "Horas presup.", width: 11, numeric: true }, { label: "Importe USD", width: 12, numeric: true },
+  { label: "PAR / finalidad", width: 13 }, { label: "Creado el", width: 8 }, { label: "Cliente", width: 16 },
+  { label: "Planta", width: 11 }, { label: "Estado", width: 10 },
+  { label: "Horas presup.", width: 7, numeric: true },
+  { label: "Subtotal USD", width: 10, numeric: true }, { label: "Desc. %", width: 5, numeric: true },
+  { label: "Descuento USD", width: 10, numeric: true }, { label: "Total final USD", width: 10, numeric: true },
 ];
 const SUMMARY_COLUMNS = [
   { label: "Técnico", width: 40 }, { label: "O/S atendidas", width: 15, numeric: true },
@@ -55,7 +58,8 @@ function filterText(report) {
   const { filters } = report;
   const dateLabel = filters.type === "pars" ? "Creación" : "Cierre";
   const period = `${filters.from ? filters.from.split("-").reverse().join("/") : "Sin fecha inicial"} a ${filters.to ? filters.to.split("-").reverse().join("/") : "Sin fecha final"}`;
-  return `${report.clientName}  |  ${filters.type === "pars" ? `Estado: ${filters.status || "Todos"}` : report.technicianName}\n${dateLabel}: ${period}  |  Horario: Venezuela (America/Caracas)`;
+  return `${report.clientName}  |  ${filters.type === "pars" ? `Estado: ${filters.status || "Todos"}` : report.technicianName}\n${filters.type === "pars" ? `Finalidad: ${filters.parPurpose ? parPurposeLabel(filters.parPurpose) : "Todas"}` : `Clasificación: ${filters.orderKind ? orderKindLabel(filters.orderKind) : "Todas"}`}
+${dateLabel}: ${period}  |  Horario: Venezuela (America/Caracas)`;
 }
 
 function ReportPage({ report, logo, section, columns, children }) {
@@ -98,32 +102,35 @@ function ReportDocument({ report, logo }) {
       {report.filters.type === "pars" ? (
         <ReportPage report={report} logo={logo} columns={PAR_COLUMNS} section="PAR registrados">
           {report.rows.map((row, index) => <Row key={row.id} columns={PAR_COLUMNS} alternate={index % 2 === 1} values={[
-            row.par_number, reportDate(row.created_at), row.client_name, row.plant_name, row.display_status,
-            reportNumber(row.budgeted_hours), reportNumber(row.total_usd),
+            `${row.par_number}\n${parPurposeLabel(row.purpose)}`, reportDate(row.created_at), row.client_name, row.plant_name, row.display_status,
+            reportNumber(row.budgeted_hours), reportNumber(row.subtotal_usd), reportNumber(row.discount_percent),
+            reportNumber(row.discount_amount_usd), reportNumber(row.total_usd),
           ]} />)}
           <View wrap={false} style={styles.total}>
-            <Text>{report.totals.pars} PAR  |  Horas presupuestadas: {reportNumber(report.totals.hours)} h  |  Importe total: USD {reportNumber(report.totals.usd)}</Text>
+            <Text>{report.totals.pars} PAR  |  Horas presupuestadas: {reportNumber(report.totals.hours)} h</Text>
+            <Text>Subtotal: USD {reportNumber(report.totals.subtotalUsd)}  |  Descuentos: USD {reportNumber(report.totals.discountUsd)}  |  Total final: USD {reportNumber(report.totals.usd)}</Text>
           </View>
-          <Text style={styles.note}>Las horas presupuestadas provienen de la cantidad de los productos que requieren técnico. El multiplicador comercial no interviene en esas horas.</Text>
+          <Text style={styles.note}>El descuento general se aplica al subtotal de cada PAR. Las horas presupuestadas provienen de las cantidades de mano de obra; el multiplicador comercial y el descuento no intervienen en esas horas.</Text>
         </ReportPage>
       ) : (
         <>
           <ReportPage report={report} logo={logo} columns={SUMMARY_COLUMNS} section="Resumen por técnico · Solo órdenes cerradas con horas confirmadas">
-            {report.groups.map((group, index) => <Row key={group.id} columns={SUMMARY_COLUMNS} alternate={index % 2 === 1} values={[
-              group.name, group.orderCount, reportNumber(group.estimated), reportNumber(group.actual), reportNumber(group.difference, true),
+            {report.groups.map((group, index) => <Row key={`${group.id}:${group.orderKind}`} columns={SUMMARY_COLUMNS} alternate={index % 2 === 1} values={[
+              `${group.name} · ${orderKindLabel(group.orderKind)}`, group.orderCount, reportNumber(group.estimated), reportNumber(group.actual), reportNumber(group.difference, true),
             ]} />)}
             <View wrap={false} style={styles.total}>
               <Text>{report.totals.technicians} técnicos  |  {report.totals.orders} O/S distintas</Text>
+              {report.totals.byKind?.map((entry)=><Text key={entry.kind}>{orderKindLabel(entry.kind)}: estimadas {reportNumber(entry.estimated)} h · reales {reportNumber(entry.actual)} h</Text>)}
               <Text>Estimadas: {reportNumber(report.totals.estimated)} h  |  Reales: {reportNumber(report.totals.actual)} h  |  Diferencia: {reportNumber(report.totals.difference, true)} h</Text>
             </View>
             <Text style={styles.note}>Diferencia = reales - estimadas. Un valor positivo indica más horas utilizadas; uno negativo indica menos horas. Una misma O/S puede aparecer para varios técnicos; el total general cuenta órdenes distintas.</Text>
             {reportHistoricalNotes(report).map((note) => <Text key={note} style={styles.note}>{note}</Text>)}
           </ReportPage>
           {report.groups.map((group) => (
-            <ReportPage key={group.id} report={report} logo={logo} columns={DETAIL_COLUMNS} section={`Detalle · ${group.name}`}>
+            <ReportPage key={`${group.id}:${group.orderKind}`} report={report} logo={logo} columns={DETAIL_COLUMNS} section={`Detalle · ${group.name} · ${orderKindLabel(group.orderKind)}`}>
               {group.rows.map((row, index) => <Row key={row.id} columns={DETAIL_COLUMNS} alternate={index % 2 === 1} values={[
-                row.order_code, row.par_number, row.client_name, reportDate(row.closed_at),
-                `#${row.source_item_no} · ${row.product_code || "Sin código"}\n${row.description}`,
+                `${row.order_code}\n${orderKindLabel(row.order_kind)}`, row.par_number, row.client_name, reportDate(row.closed_at),
+                `#${row.source_item_no} · ${row.product_code || "Sin código"}\n${row.description}${row.warranty_origin_order_code || row.warranty_reference ? "\nOrigen de garantía: " + (row.warranty_origin_order_code || row.warranty_reference) : ""}`,
                 reportNumber(row.hours), reportNumber(row.actual_hours), reportNumber(row.difference, true),
               ]} />)}
               <View wrap={false} style={styles.total}>

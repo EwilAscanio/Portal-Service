@@ -1,5 +1,8 @@
 # Reportes de PAR y horas por técnico
 
+> Vigente · actualizado el 31 de octubre de 2026: finalidad PAR y clasificación de horas. [Índice](README.md).
+> Guía principal de reportes. Contexto de origen: [PAR](modulos/par.md), [horas](modulos/horas-tecnicos.md) y [cierre O/S](cierre-orden-servicio.md).
+
 ## Acceso y recorrido
 
 Disponible en **Reportes** para Superadministrador, Administrador, Supervisor y Coordinador. Las APIs verifican sesión activa y los mismos permisos. Los reportes los generan usuarios internos del sistema.
@@ -14,21 +17,23 @@ El PDF se mantiene en memoria durante la vista previa; no se guarda como archivo
 
 ## PAR por cliente
 
-Filtros opcionales: cliente, estado visible del PAR y fechas de **creación del registro** (`created_at`, no `fecha_emision`). Sin filtros se consultan todos los PAR.
+Filtros opcionales: cliente, estado visible, finalidad (Todas / Comercial / Referencia para garantía) y fechas de **creación del registro** (`created_at`, no `fecha_emision`). Sin filtros se consultan todos los PAR.
 
-Columnas: número, fecha de creación, cliente, planta, estado, horas presupuestadas e importe USD. Totales: cantidad de PAR, horas presupuestadas e importe USD de los registros seleccionados.
+Columnas: número y finalidad, fecha de creación, cliente, planta, estado, horas presupuestadas, subtotal USD, descuento %, monto descontado USD y total final USD. Totales: cantidad de PAR, horas presupuestadas, subtotales, descuentos y totales finales de los registros seleccionados. No se suman los porcentajes.
 
-El estado se deriva con la misma regla que la consulta de PAR: para un PAR aprobado/con servicio/finalizado, si tiene órdenes no canceladas, se muestra Finalizado cuando todas están Completada; en otro caso, En Servicio. El filtro se aplica sobre ese resultado visible, no solamente sobre `par_header.status`.
+Los importes proceden de la cabecera guardada: `subtotal_usd`, `discount_percent`, `discount_amount_usd` y `total_usd`. El reporte no recalcula el descuento a partir de un porcentaje promedio; suma importes de cada PAR en centavos. La descarga conserva el mismo PDF mostrado.
+
+El estado se deriva con la misma regla que la consulta de PAR: para un PAR aprobado/con servicio/finalizado, se consideran las O/S normales no canceladas en PAR Comercial y las garantías en PAR de referencia; se muestra Finalizado cuando todas están Completada; en otro caso, En Servicio. El filtro se aplica sobre ese resultado visible, no solamente sobre `par_header.status`.
 
 Las horas se leen de `par_header.budgeted_hours`, suma de cantidades de productos que requieren técnico. No se multiplica por multiplicador comercial ni por cantidad de técnicos.
 
 ## Horas estimadas y reales por técnico
 
-Filtros opcionales: cliente, técnico y fechas de **cierre confirmado** (`closed_at`). Conserva técnicos y clientes inactivos para consultar el historial.
+Filtros opcionales: cliente, técnico, clasificación (Todas / Normal / Garantía) y fechas de **cierre confirmado** (`closed_at`). Conserva técnicos y clientes inactivos para consultar el historial.
 
 Incluye exclusivamente órdenes `Completada` con `closed_at`, revisión de horas resuelta, al menos una asignación y horas reales confirmadas en todas sus asignaciones. No incluye órdenes abiertas, canceladas ni borradores de horas reales.
 
-El resumen contiene técnico, cantidad de órdenes distintas, horas estimadas, horas reales y diferencia. El detalle agrupa por técnico y muestra O/S, PAR, cliente, fecha de cierre, número/código/descripción del renglón de mano de obra y las tres columnas de horas.
+El resumen agrupa por técnico **y clasificación** y contiene cantidad de órdenes distintas, horas estimadas, horas reales y diferencia. El detalle identifica clasificación y origen (código O/S o referencia externa), además de O/S, PAR, cliente, fecha de cierre, número/código/descripción del renglón y las tres columnas de horas. Los totales separan Normal y Garantía; el total de técnicos cuenta IDs distintos, sin duplicar a quien participa en ambas. Las horas de garantía no representan consumo del presupuesto comercial del PAR.
 
 - Estimadas: `service_order_labor_allocation.hours`.
 - Reales: `service_order_labor_allocation.actual_hours`, confirmadas por el cierre de la cabecera.
@@ -40,7 +45,7 @@ El resumen contiene técnico, cantidad de órdenes distintas, horas estimadas, h
 
 ### Órdenes anteriores sin información confirmada
 
-Las órdenes históricas completadas sin `closed_at` se cuentan aparte por cliente/técnico seleccionados y se excluyen del reporte numérico. La advertencia aclara que **no pueden asignarse al período**, por lo que ese conteo no se filtra por fechas ni sustituye el cierre por la fecha programada o la última edición.
+Las órdenes históricas completadas sin `closed_at` se cuentan aparte por cliente/técnico/clasificación seleccionados y se excluyen del reporte numérico. La advertencia aclara que **no pueden asignarse al período**, por lo que ese conteo no se filtra por fechas ni sustituye el cierre por la fecha programada o la última edición.
 
 Si una orden tiene fecha de cierre dentro del período pero un reparto incompleto, también se informa su exclusión. Esas advertencias aparecen en pantalla, incluso cuando no hay resultados comparables; también se incluyen en el PDF cuando hay filas para generar.
 
@@ -56,11 +61,11 @@ Si una orden tiene fecha de cierre dentro del período pero un reparto incomplet
 
 ## Implementación y despliegue
 
-Dependencia nueva: **`@react-pdf/renderer` 4.9.0**, registrada en `package.json` y `package-lock.json`. Generación con `renderToBuffer` en runtime Node. Next 16.3.4 ya incluye este paquete en su lista automática de dependencias externas del servidor. No se usa el paquete visor `react-pdf` ni se necesita PDF.js.
+Dependencia de generación: **`@react-pdf/renderer`**, con versión declarada en `package.json` y resolución en `package-lock.json`. Generación con `renderToBuffer` en runtime Node. La versión instalada de Next incluye este paquete en su lista automática de dependencias externas del servidor. No se usa el paquete visor `react-pdf` ni se necesita PDF.js.
 
 Plantilla A4 horizontal, encabezados y columnas repetidos, totales y páginas numeradas. Logo local `public/Logo.png`; nombre, RIF, contacto y dirección desde `configuration`. No se descargan logos remotos ni se leen rutas configurables. Mantener ese PNG en el despliegue. Fuentes estándar Helvetica integradas, sin descargas externas.
 
-No requiere migración adicional: presupone las migraciones **051** (asignaciones) y **052** (cierre) ya aplicadas. No modifica datos operativos.
+Requiere las migraciones **051** (asignaciones), **052** (cierre), **053** (descuento PAR) y **057** (clasificación y origen de garantía), o un esquema consolidado que incluya esa estructura. Generar el reporte no modifica datos operativos.
 
 ### Archivos
 
@@ -77,7 +82,7 @@ No requiere migración adicional: presupone las migraciones **051** (asignacione
 ### Endpoints
 
 - `GET /api/reports/catalogs`: clientes y técnicos, incluidos inactivos.
-- `POST /api/reports`: JSON `{ type, clientId, technicianId, status, from, to }`. `type` es `pars` o `technician-hours`; filtros opcionales vacíos con `""`. Para PAR, `technicianId` vacío; para horas, `status` vacío.
+- `POST /api/reports`: JSON `{ type, clientId, technicianId, status, parPurpose, orderKind, from, to }`. `type` es `pars` o `technician-hours`; filtros opcionales vacíos con `""`. Para PAR, `technicianId` y `orderKind` vacíos; para horas, `status` y `parPurpose` vacíos. Finalidades válidas: Comercial/ReferenciaGarantia; clasificaciones: Normal/Garantia; vacío incluye ambas.
 - Respuesta con filas: `application/pdf`, nombre de archivo, `X-Report-Generated-At`, `X-Report-Rows`, `X-Report-History` y `X-Report-Incomplete`.
 - Sin filas: JSON `{ empty: true, undatedHistoryCount, incompleteCount }`.
 - Errores: 400 filtros inválidos, 401 sesión inválida, 403 acceso denegado, 422 reporte demasiado amplio/consulta agotada, 500 fallo de generación.
@@ -86,6 +91,6 @@ No se debe agregar un endpoint de descarga que consulte datos de nuevo: la desca
 
 Referencias: [React PDF Node API](https://react-pdf.org/docs/v4/node), [compatibilidad con React](https://react-pdf.org/docs/v4/compatibility).
 
-## Comprobaciones de entrega
+## Alcance de revisión
 
-`npm run lint` sin errores (tres advertencias preexistentes en layout, ParForm y Axios); `npm run build` correcto; revisión de formato sin errores. No se añadieron ni ejecutaron pruebas funcionales o automatizadas, ni se generaron reportes de prueba contra la base.
+La revisión del 22 de octubre de 2026 corresponde a documentación y lectura estática. No se generaron reportes contra la base ni se ejecutaron pruebas de aplicación durante esta reorganización. Las comprobaciones de la entrega anterior son [evidencia histórica](historico/README.md), no una garantía de ejecución actual.

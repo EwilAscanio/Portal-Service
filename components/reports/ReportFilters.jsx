@@ -1,5 +1,6 @@
 "use client";
 
+import { ORDER_KINDS, PAR_PURPOSES } from "@/lib/warranty";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BarChart3, Eye, FileText, RotateCcw } from "lucide-react";
@@ -41,7 +42,7 @@ function ReportForm({ initial }) {
 
   function change(key, value) {
     setError("");
-    setFilters((previous) => ({ ...previous, [key]: value, ...(key === "type" ? { technicianId: "", status: "" } : {}) }));
+    setFilters((previous) => ({ ...previous, [key]: value, ...(key === "type" ? { technicianId: "", status: "", orderKind: "", parPurpose: "" } : {}) }));
   }
 
   function showReport(event) {
@@ -86,6 +87,7 @@ function ReportForm({ initial }) {
               { value: "", label: "Todos los estados" }, ...REPORT_PAR_STATUSES.map((status) => ({ value: status, label: status })),
             ]} />
           )}
+          <Select label={isHours ? "Clasificación de la O/S" : "Finalidad del PAR"} value={isHours ? filters.orderKind : filters.parPurpose} onChange={(event)=>change(isHours ? "orderKind" : "parPurpose",event.target.value)} options={[{value:"",label:"Todas"},...(isHours ? ORDER_KINDS : PAR_PURPOSES)]} />
           <Input label={`${isHours ? "Fecha de cierre" : "Fecha de creación"} desde`} type="date" value={filters.from} max={filters.to || "9999-12-31"} onChange={(event) => change("from", event.target.value)} />
           <Input label={`${isHours ? "Fecha de cierre" : "Fecha de creación"} hasta`} type="date" value={filters.to} min={filters.from || "0001-01-01"} onChange={(event) => change("to", event.target.value)} />
         </div>
