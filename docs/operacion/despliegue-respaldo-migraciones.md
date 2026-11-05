@@ -10,7 +10,7 @@ Instalar Node compatible con la versión Next del proyecto y PostgreSQL. Usar la
 
 | Variable | Uso |
 |---|---|
-| DATABASE_URL o DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD | Conexión PostgreSQL |
+| DATABASE_URL o DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD | Conexión PostgreSQL. Si el host no es local, `lib/db.js` añade `sslmode=require` y `ssl: true`. Neon rechaza la sesión sin TLS |
 | AUTH_SECRET | Firma/seguridad de autenticación |
 | SAINT_API_URL, SAINT_API_KEY | Integración Saint desde servidor |
 | SERVICE_ORDER_DOCUMENTS_DIR | Carpeta privada persistente de documentos de cierre |

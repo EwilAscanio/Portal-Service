@@ -13,6 +13,12 @@ export default auth((req) => {
   const session = req.auth;
   const role = session?.user?.role;
 
+  // La app móvil firma su propio JWT. El login es público y cada ruta
+  // bajo /api/mobile valida el Bearer contra users.
+  if (pathname === "/api/mobile" || pathname.startsWith("/api/mobile/")) {
+    return NextResponse.next();
+  }
+
   // Public pages (login): redirect authenticated users to the dashboard.
   if (isPublicPath(pathname)) {
     if (session) {
