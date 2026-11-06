@@ -1,13 +1,13 @@
 # Reportes
 
-> Vigente · actualizado el 6 de noviembre de 2026: catálogo con cajón de filtros, órdenes, clientes y PAR por mes. [Índice](README.md).
-> Guía principal de reportes. Contexto de origen: [PAR](modulos/par.md), [horas](modulos/horas-tecnicos.md), [cierre O/S](cierre-orden-servicio.md), [órdenes](modulos/ordenes-servicio.md) y [clientes](modulos/clientes-plantas-contactos-equipos.md).
+> Vigente · actualizado el 6 de noviembre de 2026: calendario de técnicos. [Índice](README.md).
+> Guía principal de reportes. Contexto de origen: [PAR](modulos/par.md), [horas](modulos/horas-tecnicos.md), [cierre O/S](cierre-orden-servicio.md), [órdenes](modulos/ordenes-servicio.md), [clientes](modulos/clientes-plantas-contactos-equipos.md) y [calendario](modulos/tecnicos-calendario.md).
 
 ## Acceso y recorrido
 
 Disponible en **Reportes** para Superadministrador, Administrador, Supervisor y Coordinador. Las APIs verifican sesión activa y los mismos permisos. Los reportes los generan usuarios internos del sistema.
 
-1. Elegir una tarjeta: **PAR por cliente**, **Horas estimadas y reales por técnico**, **Órdenes de servicio**, **Clientes** o **PAR por mes**. Cambiar de tarjeta no borra los filtros de las demás mientras se permanece en la página. El número de la tarjeta cuenta filtros con valor, no registros.
+1. Elegir una tarjeta: **PAR por cliente**, **Horas estimadas y reales por técnico**, **Órdenes de servicio**, **Clientes**, **PAR por mes** o **Calendario de técnicos**. Cambiar de tarjeta no borra los filtros de las demás mientras se permanece en la página. El número de la tarjeta cuenta filtros con valor, no registros.
 2. Abrir el cajón **Filtros**, definir los criterios de ese reporte y pulsar **Mostrar reporte**.
 3. Consultar la vista previa y usar **Descargar PDF**.
 4. **Volver a filtros** conserva la selección en la URL. **Limpiar** dentro del cajón limpia los criterios y conserva el tipo de reporte.
@@ -65,14 +65,22 @@ Columnas: código Saint, nombre actual, estado y conteos de plantas, contactos y
 
 Usa los mismos filtros que PAR por cliente: cliente, estado visible, finalidad y fechas de creación. Cada fila es un mes de `created_at` en `America/Caracas`, no un PAR. Columnas: mes, cantidad de PAR, horas presupuestadas, subtotal USD, descuento USD y total final USD. Los totales del documento suman los meses incluidos. No se promedia ni se suma el porcentaje de descuento. El estado visible reutiliza la regla del detalle de PAR.
 
+## Calendario de técnicos
+
+Filtros opcionales: técnico y fechas de programación. Sin técnico se incluyen todas las personas. Sin fechas, todo el historial que cumpla la regla de la agenda.
+
+Incluye órdenes con aprobación registrada y estado distinto de Cancelada. Pendiente no aparece. El horario programado debe cruzar el rango: el inicio puede ser anterior y el fin posterior. Una orden con varios técnicos produce una fila por persona. Columnas: técnico, inicio y fin, código, PAR, estado de agenda (Programada, En ejecución o Completada), cliente, planta, tipo de servicio y conflicto. El conflicto se calcula solo entre las participaciones del documento.
+
+La segunda sección lista períodos de no disponibilidad no cancelados que cruzan el rango. Solo muestra técnico y fechas inclusivas, con el texto **No disponibilidad**. No imprime categoría ni notas, y no los suma a las órdenes. Si no hay órdenes ni ausencias, no hay PDF. Si solo hay ausencias, el PDF se genera. El tope de 2.000 se aplica por separado a participaciones y a períodos; superar cualquiera de los dos impide emitir un documento parcial. [Agenda de origen](modulos/tecnicos-calendario.md).
+
 ## Fechas, lectura y límites
 
 - Zona horaria fija `America/Caracas`, tanto en filtros como en fechas impresas.
 - Rango inclusivo por días: desde el inicio del día inicial hasta antes del inicio del día siguiente al final. Se permite dejar cualquiera de los extremos vacío.
 - Zod valida tipo de reporte, UUID, fechas reales, orden de fechas y correspondencia de filtros.
 - Consultas parametrizadas dentro de una transacción **REPEATABLE READ, READ ONLY**, con timeout por sentencia de 20 segundos. Cabecera, filtros, detalle, exclusiones y totales comparten la misma lectura.
-- Máximo 2.000 renglones por documento (PAR, meses, órdenes, clientes o asignaciones). Si se supera, se pide acotar filtros; no se emite un PDF truncado ni totales parciales. En PAR por mes el tope cuenta meses, no cada PAR agrupado. Solicitud de generación en el navegador: timeout de 120 segundos.
-- Sin filas: mensaje de ausencia de resultados y descarga deshabilitada.
+- Máximo 2.000 renglones por documento (PAR, meses, órdenes, clientes, asignaciones, participaciones de agenda o períodos de no disponibilidad). Si se supera, se pide acotar filtros; no se emite un PDF truncado ni totales parciales. En PAR por mes el tope cuenta meses, no cada PAR agrupado. En el calendario, participaciones y ausencias se cuentan por separado. Solicitud de generación en el navegador: timeout de 120 segundos.
+- Sin filas: mensaje de ausencia de resultados y descarga deshabilitada. En el calendario eso ocurre solo si no hay participaciones ni ausencias.
 - Datos y PDFs con `Cache-Control: private, no-store`.
 
 ## Implementación y despliegue
@@ -81,7 +89,7 @@ Dependencia de generación: **`@react-pdf/renderer`**, con versión declarada en
 
 Plantilla A4 horizontal, encabezados y columnas repetidos, totales y páginas numeradas. Logo local `public/Logo.png`; nombre, RIF, contacto y dirección desde `configuration`. No se descargan logos remotos ni se leen rutas configurables. Mantener ese PNG en el despliegue. Fuentes estándar Helvetica integradas, sin descargas externas.
 
-Requiere las migraciones **051** (asignaciones), **052** (cierre), **053** (descuento PAR) y **057** (clasificación y origen de garantía), o un esquema consolidado que incluya esa estructura. Generar el reporte no modifica datos operativos.
+Requiere las migraciones **051** (asignaciones), **052** (cierre), **053** (descuento PAR), **057** (clasificación y origen de garantía) y, para el calendario, **058** (no disponibilidad), o un esquema consolidado que incluya esa estructura. Generar el reporte no modifica datos operativos.
 
 ### Archivos
 
@@ -98,7 +106,7 @@ Requiere las migraciones **051** (asignaciones), **052** (cierre), **053** (desc
 ### Endpoints
 
 - `GET /api/reports/catalogs`: clientes y técnicos, incluidos inactivos.
-- `POST /api/reports`: JSON `{ type, clientId, technicianId, status, parPurpose, orderKind, from, to }`. `type` es `pars`, `technician-hours`, `service-orders`, `clients` o `par-monthly`; los filtros que no corresponden al tipo viajan vacíos con `""`. PAR y PAR por mes usan cliente, estado visible, finalidad y fechas de creación. Horas usa cliente, técnico, clasificación y fecha de cierre, con `status` y `parPurpose` vacíos. Órdenes usa cliente, estado de la orden, clasificación, técnico y fechas de inicio programado. Clientes solo usa `status` con `1`, `0` o vacío. Finalidades válidas: Comercial/ReferenciaGarantia; clasificaciones: Normal/Garantia; vacío incluye ambas.
+- `POST /api/reports`: JSON `{ type, clientId, technicianId, status, parPurpose, orderKind, from, to }`. `type` es `pars`, `technician-hours`, `service-orders`, `clients`, `par-monthly` o `technician-calendar`; los filtros que no corresponden al tipo viajan vacíos con `""`. PAR y PAR por mes usan cliente, estado visible, finalidad y fechas de creación. Horas usa cliente, técnico, clasificación y fecha de cierre, con `status` y `parPurpose` vacíos. Órdenes usa cliente, estado de la orden, clasificación, técnico y fechas de inicio programado. Clientes solo usa `status` con `1`, `0` o vacío. El calendario solo usa técnico y fechas de programación. Finalidades válidas: Comercial/ReferenciaGarantia; clasificaciones: Normal/Garantia; vacío incluye ambas.
 - Respuesta con filas: `application/pdf`, nombre de archivo, `X-Report-Generated-At`, `X-Report-Rows`, `X-Report-History` y `X-Report-Incomplete`.
 - Sin filas: JSON `{ empty: true, undatedHistoryCount, incompleteCount }`.
 - Errores: 400 filtros inválidos, 401 sesión inválida, 403 acceso denegado, 422 reporte demasiado amplio/consulta agotada, 500 fallo de generación.

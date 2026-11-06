@@ -2,7 +2,8 @@ import { orderKindLabel, parPurposeLabel } from "@/lib/warranty";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Document, Image, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
-import { reportClientStatusLabel, reportDate, reportHistoricalNotes, reportInteger, reportMonth, reportNumber, reportTypeMeta } from "@/lib/reports";
+import { reportClientStatusLabel, reportDate, reportHistoricalNotes, reportInteger, reportMonth, reportNumber, reportPlainDate, reportTypeMeta } from "@/lib/reports";
+import { getCalendarOrderStatus } from "@/lib/technician-calendar-status";
 
 const styles = StyleSheet.create({
   page: { paddingTop: 238, paddingBottom: 44, paddingHorizontal: 32, fontFamily: "Helvetica", fontSize: 8, color: "#172033", lineHeight: 1.35 },
@@ -56,6 +57,16 @@ const MONTH_COLUMNS = [
   { label: "Horas presup.", width: 16, numeric: true }, { label: "Subtotal USD", width: 18, numeric: true },
   { label: "Descuento USD", width: 16, numeric: true }, { label: "Total final USD", width: 18, numeric: true },
 ];
+const CALENDAR_COLUMNS = [
+  { label: "Técnico", width: 14 }, { label: "Horario", width: 20 }, { label: "O/S", width: 9 },
+  { label: "PAR", width: 9 }, { label: "Estado", width: 12 }, { label: "Cliente / planta", width: 18 },
+  { label: "Servicio", width: 12 }, { label: "Conflicto", width: 6 },
+];
+const ABSENCE_COLUMNS = [
+  { label: "Técnico", width: 40 }, { label: "Desde", width: 20 }, { label: "Hasta", width: 20 }, { label: "Detalle", width: 20 },
+];
+const CALENDAR_SERVICE_LABELS = { Inspection: "Revisión", Maintenance: "Mantenimiento", Emergency: "Emergencia", Other: "Otro" };
+const CALENDAR_WORK_LABELS = { Internal: "Interna", External: "Externa" };
 
 function Row({ columns, values, header = false, alternate = false }) {
   return (
@@ -82,6 +93,9 @@ function filterText(report) {
   const period = periodText(filters);
   if (filters.type === "service-orders") {
     return `${report.clientName}  |  ${report.technicianName}  |  Estado: ${filters.status || "Todos"}\nClasificación: ${filters.orderKind ? orderKindLabel(filters.orderKind) : "Todas"}  |  Inicio programado: ${period}  |  ${zone}`;
+  }
+  if (filters.type === "technician-calendar") {
+    return `${report.technicianName}\nProgramación: ${period}  |  ${zone}`;
   }
   if (filters.type === "technician-hours") {
     return `${report.clientName}  |  ${report.technicianName}\nClasificación: ${filters.orderKind ? orderKindLabel(filters.orderKind) : "Todas"}  |  Cierre: ${period}  |  ${zone}`;
@@ -180,6 +194,35 @@ function ReportDocument({ report, logo }) {
             <Text>{report.totals.clients} clientes  |  Plantas: {reportInteger(report.totals.plants)}  |  Contactos: {reportInteger(report.totals.contacts)}  |  Equipos: {reportInteger(report.totals.equipment)}</Text>
           </View>
           <Text style={styles.note}>El estado Activo corresponde a Saint «1» e Inactivo a «0». Los conteos son las plantas, contactos y equipos actuales; no hay saldos ni facturación.</Text>
+        </ReportPage>
+      ) : null}
+      {type === "technician-calendar" && report.rows.length ? (
+        <ReportPage report={report} logo={logo} columns={CALENDAR_COLUMNS} section="Participaciones de la agenda">
+          {report.rows.map((row, index) => <Row key={`${row.service_order_id}:${row.technician_id}`} columns={CALENDAR_COLUMNS} alternate={index % 2 === 1} values={[
+            row.technician_name,
+            `${reportDate(row.start_at, true)}\n${reportDate(row.end_at, true)}`,
+            row.order_code,
+            row.par_number,
+            getCalendarOrderStatus(row.status).label,
+            `${row.client_name || "Sin cliente"}\n${row.plant_name || "Sin planta"}`,
+            `${CALENDAR_SERVICE_LABELS[row.service_type] || row.service_type || "Sin tipo"}\n${CALENDAR_WORK_LABELS[row.work_type] || ""}`,
+            row.has_conflict ? "Sí" : "—",
+          ]} />)}
+          <View wrap={false} style={styles.total}>
+            <Text>{reportInteger(report.totals.participations)} participaciones  |  {reportInteger(report.totals.orders)} O/S distintas  |  {reportInteger(report.totals.technicians)} técnicos</Text>
+          </View>
+          <Text style={styles.note}>Cada técnico asignado genera una fila. No entran órdenes pendientes ni canceladas. El conflicto se calcula solo entre las participaciones de este documento.</Text>
+        </ReportPage>
+      ) : null}
+      {type === "technician-calendar" && report.unavailability?.length ? (
+        <ReportPage report={report} logo={logo} columns={ABSENCE_COLUMNS} section="No disponibilidad">
+          {report.unavailability.map((row, index) => <Row key={row.id} columns={ABSENCE_COLUMNS} alternate={index % 2 === 1} values={[
+            row.technician_name, reportPlainDate(row.start_date), reportPlainDate(row.end_date), "No disponibilidad",
+          ]} />)}
+          <View wrap={false} style={styles.total}>
+            <Text>{reportInteger(report.totals.absences)} períodos  |  No se suman a las órdenes</Text>
+          </View>
+          <Text style={styles.note}>Períodos de día completo que cruzan el rango. No se imprimen categoría ni notas.</Text>
         </ReportPage>
       ) : null}
       {type === "technician-hours" ? (

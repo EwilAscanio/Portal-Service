@@ -14,7 +14,8 @@ export async function POST(request) {
     const parsed = reportFiltersSchema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "Filtros inválidos." }, { status: 400, headers: REPORT_RESPONSE_HEADERS });
     const report = await readReport(parsed.data, actor);
-    if (!report.rows.length) return NextResponse.json({ empty: true, undatedHistoryCount: report.undatedHistoryCount || 0, incompleteCount: report.incompleteCount || 0 }, { headers: REPORT_RESPONSE_HEADERS });
+    const hasCalendarAbsences = Boolean(report.unavailability?.length);
+    if (!report.rows.length && !hasCalendarAbsences) return NextResponse.json({ empty: true, undatedHistoryCount: report.undatedHistoryCount || 0, incompleteCount: report.incompleteCount || 0 }, { headers: REPORT_RESPONSE_HEADERS });
     const pdf = await renderReportPdf(report);
     const filename = `${reportFileSlug(parsed.data.type)}-${report.generatedAt.replace(/[:.]/g, "-")}.pdf`;
     return new Response(new Uint8Array(pdf), {

@@ -3,7 +3,7 @@
 import { ORDER_KINDS, PAR_PURPOSES } from "@/lib/warranty";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BarChart3, CalendarRange, Eye, FileText, Filter, RotateCcw, SlidersHorizontal, Users, Wrench, X } from "lucide-react";
+import { BarChart3, CalendarDays, CalendarRange, Eye, FileText, Filter, RotateCcw, SlidersHorizontal, Users, Wrench, X } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { ClientSearch } from "@/components/ui/ClientSearch";
@@ -24,6 +24,7 @@ const ICONS = {
   "service-orders": Wrench,
   clients: Users,
   "par-monthly": CalendarRange,
+  "technician-calendar": CalendarDays,
 };
 
 function draftsFrom(initial) {
@@ -243,6 +244,9 @@ function ReportHint({ type }) {
   }
   if (type === "clients") {
     return <p>Lista el código y el nombre actuales, el estado Saint y cuántas plantas, contactos y equipos tiene cada cliente. No incluye saldos ni facturas.</p>;
+  }
+  if (type === "technician-calendar") {
+    return <p>Imprime la agenda como el calendario: una fila por técnico en cada orden aprobada, con horario, cliente, planta y conflicto. Las fechas cruzan el período programado. También lista la no disponibilidad, sin categoría ni notas. Pendientes y canceladas no aparecen.</p>;
   }
   if (type === "par-monthly") {
     return <p>Agrupa los PAR por mes de creación y suma horas, subtotales, descuentos y totales finales. No promedia el porcentaje de descuento. El estado es el visible en la ventana de PAR.</p>;

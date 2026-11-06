@@ -125,4 +125,4 @@ GET/POST de `/api/technical/[id]/unavailability` consulta/registra; PUT/DELETE d
 
 La agenda combina participaciones O/S con períodos de no disponibilidad no cancelados, de día completo. Los períodos proceden de su propia tabla; no son nuevos eventos editables del calendario. Aparecen con texto genérico **No disponibilidad**, sin categorías ni notas, y no incrementan los contadores de órdenes.
 
-Los filtros por cliente o planta no ocultan ausencias; el filtro por técnico y el alcance de agenda propia sí se aplican. Calendario, tabla y tarjetas consultan las mismas fechas. El extremo final exclusivo enviado a FullCalendar es el día posterior al último día registrado.
+Los filtros por cliente o planta no ocultan ausencias; el filtro por técnico y el alcance de agenda propia sí se aplican. Calendario, tabla y tarjetas consultan las mismas fechas. El extremo final exclusivo enviado a FullCalendar es el día posterior al último día registrado. La impresión de esa agenda está en [reportes](../reportes.md).
