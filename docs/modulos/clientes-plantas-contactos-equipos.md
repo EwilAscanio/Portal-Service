@@ -20,7 +20,7 @@ Fuentes: `app/api/client/route.js`, `app/api/client/sync/route.js`, `lib/saint-a
 | Sincronizar | Datos válidos | Upsert por codclie dentro de transacción y bloqueo asesor | Preserva UUID existentes y actualiza datos comerciales |
 | Finalizar | Resultado de operación | integration_sync_run, conteos y fechas | Completed o Failed; trazabilidad de integración |
 
-Los estados persistidos son `'1'` (activo) y `'0'` (inactivo). No se desactiva a un cliente por estar ausente en una respuesta: se usa su estado explícito. Las relaciones históricas no se eliminan al inactivarlo. Nuevas selecciones operativas comprueban actividad.
+Los estados persistidos son `'1'` (activo) y `'0'` (inactivo). No se desactiva a un cliente por estar ausente en una respuesta: se usa su estado explícito. Las relaciones históricas no se eliminan al inactivarlo. Nuevas selecciones operativas comprueban actividad. El reporte de clientes lee ese estado y los conteos actuales. [Reportes](../reportes.md).
 
 La URL Saint es el origen del servicio; la integración construye las rutas y envía la clave en `x-api-key`. No publicar valores de `SAINT_API_KEY` ni respuestas reales en documentación. El cliente se administra desde Saint; no hay CRUD comercial libre en la ventana del portal.
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { reportFileSlug } from "@/lib/reports";
 import { reportFiltersSchema } from "@/lib/validators/report.schema";
 import { readReport } from "@/lib/repositories/report.repository";
 import { renderReportPdf } from "@/lib/reports/pdf";
@@ -15,7 +16,7 @@ export async function POST(request) {
     const report = await readReport(parsed.data, actor);
     if (!report.rows.length) return NextResponse.json({ empty: true, undatedHistoryCount: report.undatedHistoryCount || 0, incompleteCount: report.incompleteCount || 0 }, { headers: REPORT_RESPONSE_HEADERS });
     const pdf = await renderReportPdf(report);
-    const filename = `${parsed.data.type === "pars" ? "par-por-cliente" : "horas-por-tecnico"}-${report.generatedAt.replace(/[:.]/g, "-")}.pdf`;
+    const filename = `${reportFileSlug(parsed.data.type)}-${report.generatedAt.replace(/[:.]/g, "-")}.pdf`;
     return new Response(new Uint8Array(pdf), {
       headers: {
         ...REPORT_RESPONSE_HEADERS,

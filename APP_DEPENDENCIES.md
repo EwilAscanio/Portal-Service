@@ -59,7 +59,7 @@ Las flechas expresan consumo funcional; no todas representan claves foráneas. P
 | Usuarios y roles | Credentials, users/role, actor autorizado | Identidad, estado, rol, último acceso | Toda autorización; técnico vinculado y actores de auditoría | [Usuarios](docs/modulos/usuarios-configuracion.md) |
 | Configuración | Datos de empresa, tasa, sincronización Saint de ubicación y vendedores | configuration singleton; country, state, city, vendor | Tasa copiada al PAR; datos de empresa leídos en documentos/reportes; vendedores solo se consultan | [Configuración](docs/modulos/usuarios-configuracion.md) |
 | Importaciones | Excel + catálogos actuales + Superadministrador | Lotes/filas de análisis y cambios transaccionales de catálogos | Productos, plantas, contactos y equipos; alcance futuro del PAR | [Importaciones](docs/modulos/importaciones.md) |
-| Reportes | PAR o asignaciones de O/S cerradas + filtros + empresa | PDF temporal, sin historial persistente | Consulta de usuarios y entrega al cliente | [Reportes](docs/reportes.md) |
+| Reportes | PAR, PAR por mes, órdenes, clientes con conteos y asignaciones de O/S cerradas + filtros + empresa | PDF temporal, sin historial persistente | Consulta de usuarios y entrega al cliente | [Reportes](docs/reportes.md) |
 | Dashboard / búsqueda | Tablas operativas y catálogos | Consultas agregadas/resultados | Navegación y resumen; no son fuente de autorización | [Soporte](docs/modulos/dashboard-busqueda-perfil.md) |
 | Perfil / notificaciones | Sesión y datos de demostración | Funcionalidad parcial descrita en guía | No existe automatización real del flujo PAR/O/S desde estos módulos | [Soporte](docs/modulos/dashboard-busqueda-perfil.md) |
 

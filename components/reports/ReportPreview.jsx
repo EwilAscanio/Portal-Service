@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { generateReport } from "@/lib/api";
-import { REPORT_TYPES, reportDate, reportFiltersFromSearch, reportHistoricalNotes, reportSearch } from "@/lib/reports";
+import { reportDate, reportEmptyDescription, reportFiltersFromSearch, reportHistoricalNotes, reportRowCountLabel, reportSearch, reportTypeMeta } from "@/lib/reports";
 import { reportFiltersSchema } from "@/lib/validators/report.schema";
 
 export default function ReportPreview() {
@@ -23,7 +23,7 @@ export default function ReportPreview() {
 
 function PreviewDocument({ filters, onRefresh }) {
   const router = useRouter();
-  const title = REPORT_TYPES.find((type) => type.value === filters.type).label;
+  const title = reportTypeMeta(filters.type).label;
   usePageTitle(title);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
@@ -71,10 +71,10 @@ function PreviewDocument({ filters, onRefresh }) {
         {loading ? <div role="status" className="flex min-h-80 flex-col items-center justify-center gap-3 p-8 text-muted"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /><p>Generando reporte…</p></div> : error ? (
           <div role="alert"><EmptyState title="No se pudo generar el reporte" description={error} action={<Button onClick={onRefresh}>Reintentar</Button>} /></div>
         ) : result?.empty ? (
-          <EmptyState icon={FileText} title="No hay resultados para estos filtros" description={filters.type === "technician-hours" ? "No hay órdenes cerradas con horas reales confirmadas que coincidan con la selección." : "No hay PAR que coincidan con la selección."} action={<Button variant="secondary" onClick={() => router.push(`/reportes?${reportSearch(filters)}`)}>Cambiar filtros</Button>} />
+          <EmptyState icon={FileText} title="No hay resultados para estos filtros" description={reportEmptyDescription(filters.type)} action={<Button variant="secondary" onClick={() => router.push(`/reportes?${reportSearch(filters)}`)}>Cambiar filtros</Button>} />
         ) : result?.url ? <>
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3 text-xs text-muted">
-            <span>Generado el {reportDate(result.generatedAt, true)} · {result.rowCount} {filters.type === "pars" ? "PAR" : "renglones de mano de obra"}</span>
+            <span>Generado el {reportDate(result.generatedAt, true)} · {reportRowCountLabel(filters.type, result.rowCount)}</span>
             <span>La descarga contiene este mismo documento.</span>
           </div>
           <iframe src={result.url} title={`Vista previa: ${title}`} className="h-[75vh] min-h-[480px] w-full bg-slate-100" />

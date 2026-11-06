@@ -1,16 +1,16 @@
-# Reportes de PAR y horas por técnico
+# Reportes
 
-> Vigente · actualizado el 31 de octubre de 2026: finalidad PAR y clasificación de horas. [Índice](README.md).
-> Guía principal de reportes. Contexto de origen: [PAR](modulos/par.md), [horas](modulos/horas-tecnicos.md) y [cierre O/S](cierre-orden-servicio.md).
+> Vigente · actualizado el 6 de noviembre de 2026: catálogo con cajón de filtros, órdenes, clientes y PAR por mes. [Índice](README.md).
+> Guía principal de reportes. Contexto de origen: [PAR](modulos/par.md), [horas](modulos/horas-tecnicos.md), [cierre O/S](cierre-orden-servicio.md), [órdenes](modulos/ordenes-servicio.md) y [clientes](modulos/clientes-plantas-contactos-equipos.md).
 
 ## Acceso y recorrido
 
 Disponible en **Reportes** para Superadministrador, Administrador, Supervisor y Coordinador. Las APIs verifican sesión activa y los mismos permisos. Los reportes los generan usuarios internos del sistema.
 
-1. Seleccionar **PAR por cliente** u **Horas estimadas y reales por técnico**.
-2. Elegir filtros y pulsar **Mostrar Reporte**.
+1. Elegir una tarjeta: **PAR por cliente**, **Horas estimadas y reales por técnico**, **Órdenes de servicio**, **Clientes** o **PAR por mes**. Cambiar de tarjeta no borra los filtros de las demás mientras se permanece en la página. El número de la tarjeta cuenta filtros con valor, no registros.
+2. Abrir el cajón **Filtros**, definir los criterios de ese reporte y pulsar **Mostrar reporte**.
 3. Consultar la vista previa y usar **Descargar PDF**.
-4. **Volver a filtros** conserva la selección en la URL. **Limpiar filtros** limpia los criterios y conserva el tipo de reporte.
+4. **Volver a filtros** conserva la selección en la URL. **Limpiar** dentro del cajón limpia los criterios y conserva el tipo de reporte.
 5. **Actualizar reporte** vuelve a consultar la base y genera un nuevo documento. Descargar reutiliza exactamente los bytes del documento mostrado, aunque otras sesiones hayan cambiado datos posteriormente.
 
 El PDF se mantiene en memoria durante la vista previa; no se guarda como archivo permanente ni se crea un historial de reportes. Al salir de la vista se cancela la solicitud pendiente y se libera su URL temporal. Recargar o volver a entrar genera una lectura nueva. La vista usa el visor PDF del navegador; si no está disponible, el botón de descarga permite abrir el archivo.
@@ -49,13 +49,29 @@ Las órdenes históricas completadas sin `closed_at` se cuentan aparte por clien
 
 Si una orden tiene fecha de cierre dentro del período pero un reparto incompleto, también se informa su exclusión. Esas advertencias aparecen en pantalla, incluso cuando no hay resultados comparables; también se incluyen en el PDF cuando hay filas para generar.
 
+## Órdenes de servicio
+
+Filtros opcionales: cliente, estado guardado (`Pendiente`, `Aprobada`, `En Proceso`, `Completada`, `Cancelada`), clasificación (Todas / Normal / Garantía), técnico y fechas de **inicio programado** (`scheduled_start`). Sin estado se incluyen las canceladas. Sin técnico se incluyen todas las órdenes del resto de filtros.
+
+Una fila por orden: código, PAR, cliente, planta, estado, clasificación, técnicos actuales y inicio programado. Si la orden tiene `closed_at`, el PDF también imprime esa fecha de cierre. El responsable aparece primero. Los nombres salen del catálogo actual de técnicos; si la orden no tiene asignaciones en `service_order_technician`, se usa el nombre guardado en la orden. El total cuenta órdenes y separa Normal y Garantía. No suma horas ni importes.
+
+## Clientes
+
+Filtro opcional: estado Saint, mostrado como Activo (`1`) o Inactivo (`0`). Sin filtro se listan ambos. No hay filtro de cliente, técnico ni fechas, ni saldos o facturas.
+
+Columnas: código Saint, nombre actual, estado y conteos de plantas, contactos y equipos vinculados hoy. El total suma esos conteos. Un cliente inactivo conserva sus relaciones históricas en el conteo.
+
+## PAR por mes
+
+Usa los mismos filtros que PAR por cliente: cliente, estado visible, finalidad y fechas de creación. Cada fila es un mes de `created_at` en `America/Caracas`, no un PAR. Columnas: mes, cantidad de PAR, horas presupuestadas, subtotal USD, descuento USD y total final USD. Los totales del documento suman los meses incluidos. No se promedia ni se suma el porcentaje de descuento. El estado visible reutiliza la regla del detalle de PAR.
+
 ## Fechas, lectura y límites
 
 - Zona horaria fija `America/Caracas`, tanto en filtros como en fechas impresas.
 - Rango inclusivo por días: desde el inicio del día inicial hasta antes del inicio del día siguiente al final. Se permite dejar cualquiera de los extremos vacío.
 - Zod valida tipo de reporte, UUID, fechas reales, orden de fechas y correspondencia de filtros.
 - Consultas parametrizadas dentro de una transacción **REPEATABLE READ, READ ONLY**, con timeout por sentencia de 20 segundos. Cabecera, filtros, detalle, exclusiones y totales comparten la misma lectura.
-- Máximo 2.000 renglones por documento (PAR o asignaciones). Si se supera, se pide acotar filtros; no se emite un PDF truncado ni totales parciales. Solicitud de generación en el navegador: timeout de 120 segundos.
+- Máximo 2.000 renglones por documento (PAR, meses, órdenes, clientes o asignaciones). Si se supera, se pide acotar filtros; no se emite un PDF truncado ni totales parciales. En PAR por mes el tope cuenta meses, no cada PAR agrupado. Solicitud de generación en el navegador: timeout de 120 segundos.
 - Sin filas: mensaje de ausencia de resultados y descarga deshabilitada.
 - Datos y PDFs con `Cache-Control: private, no-store`.
 
@@ -82,7 +98,7 @@ Requiere las migraciones **051** (asignaciones), **052** (cierre), **053** (desc
 ### Endpoints
 
 - `GET /api/reports/catalogs`: clientes y técnicos, incluidos inactivos.
-- `POST /api/reports`: JSON `{ type, clientId, technicianId, status, parPurpose, orderKind, from, to }`. `type` es `pars` o `technician-hours`; filtros opcionales vacíos con `""`. Para PAR, `technicianId` y `orderKind` vacíos; para horas, `status` y `parPurpose` vacíos. Finalidades válidas: Comercial/ReferenciaGarantia; clasificaciones: Normal/Garantia; vacío incluye ambas.
+- `POST /api/reports`: JSON `{ type, clientId, technicianId, status, parPurpose, orderKind, from, to }`. `type` es `pars`, `technician-hours`, `service-orders`, `clients` o `par-monthly`; los filtros que no corresponden al tipo viajan vacíos con `""`. PAR y PAR por mes usan cliente, estado visible, finalidad y fechas de creación. Horas usa cliente, técnico, clasificación y fecha de cierre, con `status` y `parPurpose` vacíos. Órdenes usa cliente, estado de la orden, clasificación, técnico y fechas de inicio programado. Clientes solo usa `status` con `1`, `0` o vacío. Finalidades válidas: Comercial/ReferenciaGarantia; clasificaciones: Normal/Garantia; vacío incluye ambas.
 - Respuesta con filas: `application/pdf`, nombre de archivo, `X-Report-Generated-At`, `X-Report-Rows`, `X-Report-History` y `X-Report-Incomplete`.
 - Sin filas: JSON `{ empty: true, undatedHistoryCount, incompleteCount }`.
 - Errores: 400 filtros inválidos, 401 sesión inválida, 403 acceso denegado, 422 reporte demasiado amplio/consulta agotada, 500 fallo de generación.

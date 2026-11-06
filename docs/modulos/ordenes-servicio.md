@@ -82,3 +82,5 @@ Las escrituras adquieren bloqueo PAR → O/S antes de recalcular saldo o cambiar
 Las órdenes anteriores pueden requerir revisión de reparto y confirmación de equipos. `labor_review_required`, `legacy_worked_hours` y campos de revisión distinguen esa situación. No reconstruir automáticamente el trabajo real desde un total histórico. La revisión especial requiere roles aprobadores, justificación y técnicos del roster original; puede registrar un reparto vacío justificado cuando no corresponde asignar horas.
 
 Los cierres anteriores sin expediente permanecen identificados como tales. La auditoría disponible comprende aprobación, revisión de horas y eventos del expediente; no equivale a un log completo de todas las modificaciones generales.
+
+El listado de órdenes para consulta e impresión está en [reportes](../reportes.md).

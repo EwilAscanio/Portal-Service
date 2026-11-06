@@ -122,7 +122,7 @@ El presupuesto de horas suma únicamente `qty` de ítems con `requires_technicia
 
 - O/S hereda cliente, planta y contacto; selecciona equipos y renglones del PAR.
 - Saldo disponible se calcula por ítem entre las O/S normales del PAR; las garantías registran sus horas aparte.
-- Reportes leen cabecera, relaciones actuales, presupuesto y estado derivado.
+- Reportes leen cabecera, relaciones actuales, presupuesto y estado derivado. El agrupado mensual usa esa misma lectura. [Reportes](../reportes.md).
 - Vistas e impresión consumen equipos y detalles guardados.
 - Aprobación conserva actor/fecha; no existe un historial universal de cada edición de campo.
 
